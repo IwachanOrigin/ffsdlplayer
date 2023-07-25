@@ -77,7 +77,6 @@ int VideoDecoder::video_thread(void *arg)
     // init set pts to 0 for all frames
     pts = 0.0;
 
-    Timer timerDecode;
     // give the decoder raw compressed data in an AVPacket
     ret = avcodec_send_packet(videoState->video_ctx, packet);
     if (ret < 0)
@@ -103,7 +102,6 @@ int VideoDecoder::video_thread(void *arg)
       {
         frameFinished = 1;
       }
-      std::cout << "Decode time : " << timerDecode.elapsed() << std::endl;
 
       pts = this->guess_correct_pts(videoState->video_ctx, pFrame->pts, pFrame->pkt_dts);
       // in case we get an undefined timestamp value
