@@ -50,7 +50,7 @@ set(EXTERNAL_DLLS
   ${FFMPEG_PATH_BIN}/avutil-58.dll
   ${FFMPEG_PATH_BIN}/swresample-4.dll
   ${FFMPEG_PATH_BIN}/swscale-7.dll
-  ${_sdl2_dll_library}
+  ${SDL2_BINDIR}/SDL2.dll
 )
 
 # Set the ffmpeg, sdl2 include directory
