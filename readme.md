@@ -10,6 +10,16 @@
     - SDL2 2.26.5  
     - FFMPEG 6.0+  
 
+## Setup
+
+### For Windows
+
+
+### For Ubuntu
+
+    sudo apt-get install libsdl2-dev  
+    sudo apt-get install libsdl2-image-dev libsdl2-mixer-dev libsdl2-net-dev libsdl2-ttf-dev  
+
 ## Build
 
     - Ninja + LLVM 16.0  
