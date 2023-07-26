@@ -19,6 +19,7 @@ set(main_src
   videorenderer.cpp
   timer.h
   myavpacketlist.h
+  stringhelper.h
 )
 
 add_executable(
