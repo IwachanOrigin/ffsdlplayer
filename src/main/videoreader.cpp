@@ -15,7 +15,7 @@ VideoReader::~VideoReader()
 {
 }
 
-int VideoReader::start(const std::string filename)
+int VideoReader::start(const std::string filename, const int audioDeviceIndex)
 {
   if (m_videoState == nullptr)
   {
@@ -24,6 +24,9 @@ int VideoReader::start(const std::string filename)
 
   // set filename
   m_videoState->filename = filename;
+
+  // set output audio device index
+  m_videoState->output_audio_device_index = audioDeviceIndex;
 
   // start read thread
   std::thread([&](VideoReader *reader)
@@ -39,12 +42,14 @@ int VideoReader::read_thread(void *arg)
   int ret = -1;
 
   // init
+#if 0
   ret = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER);
   if (ret != 0)
   {
     std::cerr << "Could not initialize SDL" << SDL_GetError() << std::endl;
     return -1;
   }
+#endif
 
   // retrieve global VideoState reference
   VideoState *videoState = (VideoState *)arg;
@@ -385,16 +390,7 @@ int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
     wants.userdata = videoState;
 
     // open audio device
-    int num = SDL_GetNumAudioDevices(0);
-    for (int i = 0; i < num; i++)
-    {
-      deviceID = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(i, 0), false, &wants, &spec, 0);
-      if (deviceID > 0)
-      {
-        break;
-      }
-    }
-
+    deviceID = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(m_videoState->output_audio_device_index, 0), false, &wants, &spec, 0);
     if (deviceID <= 0)
     {
       ret = -1;
@@ -410,70 +406,68 @@ int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
 
   switch (codecCtx->codec_type)
   {
-  case AVMEDIA_TYPE_AUDIO:
-  {
-    // set videostate audio
-    videoState->audioStream = stream_index;
-    videoState->audio_st = pFormatCtx->streams[stream_index];
-    videoState->audio_ctx = codecCtx;
-    videoState->audio_buf_size = 0;
-    videoState->audio_buf_index = 0;
-    videoState->av_sync_type = DEFAULT_AV_SYNC_TYPE;
+    case AVMEDIA_TYPE_AUDIO:
+    {
+      // set videostate audio
+      videoState->audioStream = stream_index;
+      videoState->audio_st = pFormatCtx->streams[stream_index];
+      videoState->audio_ctx = codecCtx;
+      videoState->audio_buf_size = 0;
+      videoState->audio_buf_index = 0;
+      videoState->av_sync_type = DEFAULT_AV_SYNC_TYPE;
 
-    // zero out the block of memory pointed
-    std::memset(&videoState->audio_pkt, 0, sizeof(videoState->audio_pkt));
+      // zero out the block of memory pointed
+      std::memset(&videoState->audio_pkt, 0, sizeof(videoState->audio_pkt));
 
-    // init audio pkt queue
-    videoState->audioq.init();
+      // init audio pkt queue
+      videoState->audioq.init();
 
-    // start playing audio device
-    SDL_PauseAudioDevice(deviceID, 0);
+      // start playing audio device
+      SDL_PauseAudioDevice(deviceID, 0);
+    }
+    break;
+
+    case AVMEDIA_TYPE_VIDEO:
+    {
+      // set videostate video
+      videoState->videoStream = stream_index;
+      videoState->video_st = pFormatCtx->streams[stream_index];
+      videoState->video_ctx = codecCtx;
+
+      // !!! Don't forget to init the frame timer
+      // previous frame delay: 1ms = 1e-6s
+      videoState->frame_timer = (double)av_gettime() / 1000000.0;
+      videoState->frame_last_delay = 40e-3;
+      videoState->video_current_pts_time = av_gettime();
+
+      // init video packet queue
+      videoState->videoq.init();
+
+      // start video thread
+      m_videoDecoder = new VideoDecoder();
+      m_videoDecoder->start(videoState);
+
+      // set up the videostate swscontext to convert the image data to yuv420
+      videoState->sws_ctx = sws_getContext(videoState->video_ctx->width
+                                           , videoState->video_ctx->height
+                                           , videoState->video_ctx->pix_fmt
+                                           , videoState->video_ctx->width
+                                           , videoState->video_ctx->height
+                                           , AV_PIX_FMT_YUV420P
+                                           , SWS_BILINEAR
+                                           , nullptr
+                                           , nullptr
+                                           , nullptr);
+      // init sdl_surface mutex ref
+      videoState->screen_mutex = SDL_CreateMutex();
+
+    }
+    break;
+
+    default:
+    {
+      // nothing
+    }
   }
-  break;
-
-  case AVMEDIA_TYPE_VIDEO:
-  {
-    // set videostate video
-    videoState->videoStream = stream_index;
-    videoState->video_st = pFormatCtx->streams[stream_index];
-    videoState->video_ctx = codecCtx;
-
-    // !!! Don't forget to init the frame timer
-    // previous frame delay: 1ms = 1e-6s
-    videoState->frame_timer = (double)av_gettime() / 1000000.0;
-    videoState->frame_last_delay = 40e-3;
-    videoState->video_current_pts_time = av_gettime();
-
-    // init video packet queue
-    videoState->videoq.init();
-
-    // start video thread
-    m_videoDecoder = new VideoDecoder();
-    m_videoDecoder->start(videoState);
-
-    // set up the videostate swscontext to convert the image data to yuv420
-    videoState->sws_ctx = sws_getContext(videoState->video_ctx->width
-                                         , videoState->video_ctx->height
-                                         , videoState->video_ctx->pix_fmt
-                                         , videoState->video_ctx->width
-                                         , videoState->video_ctx->height
-                                         , AV_PIX_FMT_YUV420P
-                                         , SWS_BILINEAR
-                                         , nullptr
-                                         , nullptr
-                                         , nullptr);
-    // init sdl_surface mutex ref
-    videoState->screen_mutex = SDL_CreateMutex();
-
-  }
-  break;
-
-  default:
-  {
-    // nothing
-  }
-  break;
-  }
-
   return 0;
 }

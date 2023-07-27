@@ -109,6 +109,9 @@ public:
   // file name
   std::string filename;
 
+  // output audio device index
+  int output_audio_device_index;
+
   // quit flag
   int quit;
 

@@ -79,10 +79,20 @@ int wmain(int argc, wchar_t *argv[])
     return -1;
   }
 
+  std::vector<std::wstring> vecAudioOutDevNames;
+  int deviceNum = getOutputAudioDeviceList(vecAudioOutDevNames);
+  int outputAudioDevIndex = std::stoi(argv[2]);
+  if (deviceNum < outputAudioDevIndex)
+  {
+    std::cerr << "Failed to input audio output device number." << std::endl;
+    usage();
+    return -1;
+  }
+
   std::unique_ptr<VideoReader> videoReader = std::make_unique<VideoReader>();
   std::wstring wsFilename = std::wstring(argv[1]);
   std::string filename = wstringToString(wsFilename);
-  videoReader->start(filename);
+  videoReader->start(filename, outputAudioDevIndex);
   while(1)
   {
     std::chrono::milliseconds duration(1000);
