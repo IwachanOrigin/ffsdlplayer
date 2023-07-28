@@ -290,15 +290,16 @@ void VideoRenderer::video_display()
   // create window, renderer and textures if not already created
   if (!m_screen)
   {
+    //int flags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS | SDL_WINDOW_TOOLTIP;
+    int flags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE;
     m_screen = SDL_CreateWindow(
       "display"
-      , 0
-      , 0
+      , SDL_WINDOWPOS_UNDEFINED
+      , SDL_WINDOWPOS_UNDEFINED
       , m_videoState->video_ctx->width / 2
       , m_videoState->video_ctx->height / 2
-      , SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI
+      , flags
       );
-
     SDL_GL_SetSwapInterval(1);
   }
 
@@ -409,7 +410,7 @@ void VideoRenderer::video_display()
       SDL_RenderClear(m_videoState->renderer);
 
       // copy a portion of the texture to the current rendering target
-      SDL_RenderCopy(m_videoState->renderer, m_videoState->texture, nullptr, nullptr);
+      SDL_RenderCopy(m_videoState->renderer, m_videoState->texture, &rect, nullptr);
 
       // update the screen with any rendering performed since the previous call
       SDL_RenderPresent(m_videoState->renderer);
