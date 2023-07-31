@@ -41,16 +41,6 @@ int VideoReader::read_thread(void *arg)
 {
   int ret = -1;
 
-  // init
-#if 0
-  ret = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER);
-  if (ret != 0)
-  {
-    std::cerr << "Could not initialize SDL" << SDL_GetError() << std::endl;
-    return -1;
-  }
-#endif
-
   // retrieve global VideoState reference
   VideoState *videoState = (VideoState *)arg;
   videoState->quit = 0;
@@ -61,12 +51,16 @@ int VideoReader::read_thread(void *arg)
   AVPacket* packet = nullptr;
 
   AVFormatContext* pFormatCtx = nullptr;
-  ret = avformat_open_input(&pFormatCtx, videoState->filename.c_str(), nullptr, nullptr);
+  AVDictionary* options = nullptr;
+  av_dict_set(&options, "rtsp_transport", "tcp", 0);
+  ret = avformat_open_input(&pFormatCtx, videoState->filename.c_str(), nullptr, &options);
   if (ret < 0)
   {
     std::cerr << "Could not open file " << videoState->filename << std::endl;
     return -1;
   }
+  av_dict_free(&options);
+  options = nullptr;
 
   // reset streamindex
   videoState->videoStream = -1;
