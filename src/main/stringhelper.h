@@ -44,17 +44,15 @@ namespace
     return rt;
   }
 #else
-  const int UNICODELEN_MAX_SIZE = 256;
-
   template <class T>
   std::string wstringToString(T ws)
   {
-    mbstate_t state;
-    memset(&state, 0, sizeof(state));
-    size_t len = wcsrtombs(NULL, &ws.c_str(), 0, &state);
+    std::mbstate_t state = std::mbstate_t();
+    auto temp = ws.c_str();
+    size_t len = std::wcsrtombs(NULL, &temp, 0, &state);
     char* cpMultiByte = new char[len + 1];
-    memset(cpMultiByte, 0, (len + 1) * sizeof(char));
-    wcsrtombs(cpMultiByte, &ws.c_str(), len, &state);
+    std::memset(cpMultiByte, 0, (len + 1) * sizeof(char));
+    std::wcsrtombs(cpMultiByte, &temp, len, &state);
     std::string oRet;
     oRet = (char*)cpMultiByte;
     delete[] cpMultiByte;
@@ -64,12 +62,12 @@ namespace
   template <class T>
   std::wstring UTF8ToUnicode(T str)
   {
-    mbstate_t state;
-    memset(&state, 0, sizeof(state));
-    size_t len = mbsrtowcs(NULL, &str.c_str(), 0, &state);
+    std::mbstate_t state = std::mbstate_t();
+    auto temp = str.c_str();
+    size_t len = std::mbsrtowcs(NULL, &temp, 0, &state);
     wchar_t* pUnicode = new wchar_t[len + 1];
     memset(pUnicode, 0, (len + 1) * sizeof(wchar_t));
-    mbsrtowcs(pUnicode, &str.c_str(), len, &state);
+    std::mbsrtowcs(pUnicode, &temp, len, &state);
     std::wstring rt;
     rt = (wchar_t*)pUnicode;
     delete[] pUnicode;
