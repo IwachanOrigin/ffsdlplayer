@@ -34,15 +34,15 @@ static inline int getOutputAudioDeviceList(std::vector<std::wstring> &vec)
   return deviceNum;
 }
 
-static inline void usage()
+static inline void usage(const std::wstring& wsProgName)
 {
   // Output command line parameter.
-  std::wcout << __wargv[0]
+  std::wcout << wsProgName
              << " <file path / url>"
              << " <output audio device index>"
              << std::endl;
   std::wcout << "i.e.," << std::endl;
-  std::wcout << __wargv[0] << " /path/to/movie.mp4 1" << std::endl << std::endl;
+  std::wcout << wsProgName << " /path/to/movie.mp4 1" << std::endl << std::endl;
 
   // Get audio output devices.
   std::vector<std::wstring> vecAudioOutDevNames;
@@ -59,7 +59,7 @@ static inline void usage()
   }
 }
 
-int wmain(int argc, wchar_t *argv[])
+int main(int argc, char *argv[])
 {
   // Set locale(use to the system default locale)
   std::wcout.imbue(std::locale(""));
@@ -73,9 +73,11 @@ int wmain(int argc, wchar_t *argv[])
     return -1;
   }
 
+  std::string progName = std::string(argv[0]);
+  std::wstring wsProgName = UTF8ToUnicode(progName);
   if (argc != 3)
   {
-    usage();
+    usage(wsProgName);
     return -1;
   }
 
@@ -85,13 +87,12 @@ int wmain(int argc, wchar_t *argv[])
   if (deviceNum < outputAudioDevIndex)
   {
     std::cerr << "Failed to input audio output device number." << std::endl;
-    usage();
+    usage(wsProgName);
     return -1;
   }
 
   std::unique_ptr<VideoReader> videoReader = std::make_unique<VideoReader>();
-  std::wstring wsFilename = std::wstring(argv[1]);
-  std::string filename = wstringToString(wsFilename);
+  std::string filename = std::string(argv[1]);
   videoReader->start(filename, outputAudioDevIndex);
   while(1)
   {
