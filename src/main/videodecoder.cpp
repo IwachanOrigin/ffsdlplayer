@@ -2,7 +2,6 @@
 #include <iostream>
 #include <thread>
 #include "videodecoder.h"
-#include "timer.h"
 
 VideoDecoder::VideoDecoder()
   : m_videoState(nullptr)
