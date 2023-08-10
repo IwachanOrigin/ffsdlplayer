@@ -25,23 +25,22 @@
 #### FFMPEG
 
 NOTE1: https://ubuntuhandbook.org/index.php/2023/03/ffmpeg-6-0-released-how-to-install-in-ubuntu-22-04-20-04/  
-NOTE2: https://askubuntu.com/questions/1463747/upgrading-ffmpeg-from-v4-4-3-to-v6-with-apt-in-22-04  
+NOTE2: Savoury1 のPPAは依存関係の問題を解決できず、インストールに失敗します。  
 
 FFMPEGは6.0以降をインストールする必要があります。  
 以下の手順でPPAよりインストールを行います。  
 
 1. ffmpeg6.0のPPAを追加します。  
 
-    sudo add-apt-repository ppa:savoury1/ffmpeg6
+    sudo add-apt-repository ppa:ubuntuhandbook1/ffmpeg6
 
-2. 依存している部分があるため、ffmpeg4.0のPPAを追加します。  
-
-    sudo add-apt-repository ppa:savoury1/ffmpeg4
-
-3. update と upgrade を行います。  
+2. update を行います。  
 
     sudo apt update  
-    sudo apt full-upgrade  
+
+3. ffmpeg 6.0をインストールします  
+
+    sudo apt install ffmpeg
 
 4. インストール可能なlibav...を確認します。  
 
