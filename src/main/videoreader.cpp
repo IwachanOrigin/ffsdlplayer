@@ -1,23 +1,21 @@
 
 #include <cstring>
 #include <thread>
+
 #include "videoreader.h"
+
+#include "videodecoder.h"
+#include "audiodecoder.h"
+#include "audioresamplingstate.h"
+#include "videorenderer.h"
 
 #define MAX_QUEUE_SIZE (15 * 1024 * 1024)
 
-VideoReader::VideoReader()
-  : m_videoDecoder(nullptr)
-  , m_videoRenderer(nullptr)
-  , m_videoState(new VideoState())
-{
-}
+using namespace player;
 
-VideoReader::~VideoReader()
+int VideoReader::start(const std::string& filename, const int& audioDeviceIndex)
 {
-}
-
-int VideoReader::start(const std::string filename, const int audioDeviceIndex)
-{
+  m_videoState = std::make_unique<VideoState>();
   if (m_videoState == nullptr)
   {
     return -1;
