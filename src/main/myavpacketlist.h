@@ -10,8 +10,8 @@ extern "C"
 
 struct MyAVPacketList
 {
-  AVPacket pkt;
-  struct MyAVPacketList* next;
+  AVPacket* pkt = nullptr;
+  int frameNumber = 0;
 };
 
 #endif // MY_AV_PACKET_LIST_H_

@@ -10,6 +10,7 @@ extern "C"
 }
 
 #include "myavpacketlist.h"
+#include <queue>
 
 class PacketQueue
 {
@@ -18,19 +19,16 @@ public:
   ~PacketQueue();
 
   void init();
-  int put(AVPacket *packet);
-  int get(AVPacket *pkt, int block);
+  int push(AVPacket* packet);
+  int get(AVPacket* packet);
   void clear();
   void flush();
 
-  int size;
-  int nb_packets;
-  int quit;
-  SDL_cond *cond;
-
 private:
-  MyAVPacketList* first_pkt;
-  MyAVPacketList* last_pkt;
+  std::queue<MyAVPacketList*> m_myAvPacketListQueue;
+  int m_size;
+  int m_nbPackets;
+  SDL_cond *cond;
   SDL_mutex *mutex;
 };
 

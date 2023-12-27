@@ -31,9 +31,9 @@ int VideoReader::start(const std::string filename, const int audioDeviceIndex)
 
   // start read thread
   std::thread([&](VideoReader *reader)
-    {
-      reader->read_thread(m_videoState);
-    }, this).detach();
+  {
+    reader->read_thread(m_videoState);
+  }, this).detach();
 
   return 0;
 }
