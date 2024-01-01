@@ -21,7 +21,7 @@ private:
   SDL_Window* m_screen = nullptr;
   SDL_Texture* m_texture = nullptr;
   SDL_Renderer* m_renderer = nullptr;
-
+  
   int displayThread();
   void scheduleRefresh(int delay);
   void videoRefreshTimer();

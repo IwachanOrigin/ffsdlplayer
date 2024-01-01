@@ -32,6 +32,10 @@ int VideoRenderer::start(std::shared_ptr<VideoState> vs)
   return -1;
 }
 
+void VideoRenderer::stop()
+{
+}
+
 int VideoRenderer::displayThread()
 {
   SDL_Event event;
@@ -109,18 +113,13 @@ int VideoRenderer::displayThread()
       {
         SDL_CondSignal(m_vs->audioq.cond);
         SDL_CondSignal(m_vs->videoq.cond);
+        m_vs->setPlayerFinished();
       }
       break;
 
       case FF_REFRESH_EVENT:
       {
         this->videoRefreshTimer();
-      }
-      break;
-
-      default:
-      {
-        // nothing
       }
       break;
     }
@@ -262,10 +261,10 @@ Uint32 VideoRenderer::sdlRefreshTimerCb(Uint32 interval, void* param)
 
 void VideoRenderer::videoDisplay()
 {
+  auto& videoCodecCtx = m_vs->videoCodecCtx();
   // create window, renderer and textures if not already created
   if (!m_screen)
   {
-    auto& videoCodecCtx = m_vs->videoCodecCtx();
     //int flags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS | SDL_WINDOW_TOOLTIP;
     int flags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE;
     m_screen = SDL_CreateWindow(
@@ -298,7 +297,6 @@ void VideoRenderer::videoDisplay()
 
   if (!m_texture)
   {
-    auto& videoCodecCtx = m_vs->videoCodecCtx();
     // create a texture for a rendering context
     m_texture = SDL_CreateTexture(
       m_renderer
@@ -317,18 +315,18 @@ void VideoRenderer::videoDisplay()
   videoPicture = &m_vs->pictq[m_vs->pictq_rindex];
   if (videoPicture->frame)
   {
-    if (m_vs->video_ctx->sample_aspect_ratio.num == 0)
+    if (videoCodecCtx->sample_aspect_ratio.num == 0)
     {
       aspect_ratio = 0;
     }
     else
     {
-      aspect_ratio = av_q2d(m_vs->video_ctx->sample_aspect_ratio) * m_vs->video_ctx->width / m_vs->video_ctx->height;
+      aspect_ratio = av_q2d(videoCodecCtx->sample_aspect_ratio) * videoCodecCtx->width / videoCodecCtx->height;
     }
 
     if (aspect_ratio <= 0.0)
     {
-      aspect_ratio = (float)m_vs->video_ctx->width / (float)m_vs->video_ctx->height;
+      aspect_ratio = (float)videoCodecCtx->width / (float)videoCodecCtx->height;
     }
 
     // get the size of a window's client area
@@ -366,11 +364,12 @@ void VideoRenderer::videoDisplay()
       rect.h = 2 * h;
 
       // lock screen mutex
-      SDL_LockMutex(m_vs->screen_mutex);
+      auto& screenMutex = m_vs->screenMutex();
+      SDL_LockMutex(screenMutex);
 
       // update the texture with the new pixel data
       SDL_UpdateYUVTexture(
-        m_vs->texture
+        m_texture
         , &rect
         , videoPicture->frame->data[0]
         , videoPicture->frame->linesize[0]
@@ -381,29 +380,31 @@ void VideoRenderer::videoDisplay()
         );
 
       // clear the current rendering target with the drawing color
-      SDL_RenderClear(m_vs->renderer);
+      SDL_RenderClear(m_renderer);
 
       // copy a portion of the texture to the current rendering target
-      SDL_RenderCopy(m_vs->renderer, m_vs->texture, &rect, nullptr);
+      SDL_RenderCopy(m_renderer, m_texture, &rect, nullptr);
 
       // update the screen with any rendering performed since the previous call
-      SDL_RenderPresent(m_vs->renderer);
+      SDL_RenderPresent(m_renderer);
 
       // unlock screen mutex
-      SDL_UnlockMutex(m_vs->screen_mutex);
+      SDL_UnlockMutex(screenMutex);
     }
   }
 }
 
 double VideoRenderer::getAudioClock()
 {
-  double pts = m_vs->audio_clock;
-  int hw_buf_size = m_vs->audio_buf_size - m_vs->audio_buf_index;
+  auto& audioCodecCtx = m_vs->audioCodecCtx();
+  auto& audioStream = m_vs->audioStream();
+  double pts = m_vs->audioClock();
+  int hw_buf_size = m_vs->audioBufSize() - m_vs->audioBufIndex();
   int bytes_per_sec = 0;
-  int n = 2 * m_vs->audio_ctx->ch_layout.nb_channels;
-  if (m_vs->audio_st)
+  int n = 2 * audioCodecCtx->ch_layout.nb_channels;
+  if (audioStream)
   {
-    bytes_per_sec = m_vs->audio_ctx->sample_rate * n;
+    bytes_per_sec = audioCodecCtx->sample_rate * n;
   }
 
   if (bytes_per_sec)

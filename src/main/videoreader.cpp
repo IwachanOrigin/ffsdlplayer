@@ -46,7 +46,6 @@ int VideoReader::readThread(std::shared_ptr<VideoState> vs)
 
   // retrieve global VideoState reference
   auto videoState = vs;
-  AVPacket* packet = nullptr;
 
   // Set the AVFormatContext for the global videostate ref
   auto formatCtx = videoState->formatCtx();
@@ -98,78 +97,67 @@ int VideoReader::readThread(std::shared_ptr<VideoState> vs)
   if (videoStreamIndex == -1)
   {
     std::cerr << "Could not open video stream" << std::endl;
-    goto fail;
+    return -1;
   }
-  else
+  
+  // open video stream
+  ret = streamComponentOpen(videoState, videoStreamIndex);
+
+  // check video codec was opened correctly
+  if (ret < 0)
   {
-    // open video stream
-    ret = streamComponentOpen(videoState, videoStreamIndex);
-
-    // check video codec was opened correctly
-    if (ret < 0)
-    {
-      std::cerr << "Could not find video codec" << std::endl;
-      goto fail;
-    }
-
-    m_videoRenderer = std::make_unique<VideoRenderer>();
-    m_videoRenderer->start(videoState);
+    std::cerr << "Could not find video codec" << std::endl;
+    return -1;
   }
+
+  m_videoRenderer = std::make_unique<VideoRenderer>();
+  m_videoRenderer->start(videoState);
 
   // return with error in case no audio stream was found
   if (audioStreamIndex == -1)
   {
     std::cerr << "Could not find audio stream" << std::endl;
-    goto fail;
+    return -1;
   }
-  else
+  // open audio stream component codec
+  ret = streamComponentOpen(videoState, audioStreamIndex);
+  // check audio codec was opened correctly
+  if (ret < 0)
   {
-    // open audio stream component codec
-    ret = streamComponentOpen(videoState, audioStreamIndex);
-
-    // check audio codec was opened correctly
-    if (ret < 0)
-    {
-      std::cerr << "Could not find audio codec" << std::endl;
-      goto fail;
-    }
-  }
-  if (videoStreamIndex < 0 || audioStreamIndex < 0)
-  {
-    std::cerr << "Could not open codecs " << m_filename << std::endl;
-    goto fail;
+    std::cerr << "Could not find audio codec" << std::endl;
+    return -1;
   }
 
-  packet = av_packet_alloc();
+  AVPacket* packet = av_packet_alloc();
   if (packet == nullptr)
   {
     std::cerr << "Could not alloc packet" << std::endl;
-    goto fail;
+    return -1;
   }
 
   // main decode loop. read in a packet and put it on the queue
   for (;;)
   {
     // seek stuff goes here
-    auto& seekReq = videoState->seekRequest();
+    auto seekReq = videoState->seekRequest();
     if (seekReq)
     {
-      int64_t seek_target_video = videoState->seek_pos;
-      int64_t seek_target_audio = videoState->seek_pos;
+      auto seekTargetVideo = videoState->seekPos();
+      auto seekTargetAudio = videoState->seekPos();
 
       if (videoStreamIndex >= 0 && audioStreamIndex >= 0)
       {
         // MSVC does not support compound literals like AV_TIME_BASE_Q in C++ code (compiler error C4576)
-        AVRational timebase;
+        AVRational timebase{};
         timebase.num = 1;
         timebase.den = AV_TIME_BASE;
 
-        seek_target_video = av_rescale_q(
-          seek_target_video
+        seekTargetVideo = av_rescale_q(
+          seekTargetVideo
           , timebase
           , formatCtx->streams[videoStreamIndex]->time_base);
-        seek_target_audio = av_rescale_q(
-          seek_target_audio
+        seekTargetAudio = av_rescale_q(
+          seekTargetAudio
           , timebase
           , formatCtx->streams[audioStreamIndex]->time_base);
       }
@@ -177,33 +165,35 @@ int VideoReader::readThread(std::shared_ptr<VideoState> vs)
       ret = av_seek_frame(
         formatCtx
         , videoStreamIndex
-        , seek_target_video
-        , videoState->seek_flags);
+        , seekTargetVideo
+        , videoState->seekFlags());
       ret &= av_seek_frame(
         formatCtx
         , audioStreamIndex
-        , seek_target_audio
-        , videoState->seek_flags);
+        , seekTargetAudio
+        , videoState->seekFlags());
 
       if (ret >= 0)
       {
         if (videoStreamIndex >= 0)
         {
-          videoState->videoq.flush();
-          videoState->videoq.put(videoState->flush_pkt);
+          auto& flushPacket = videoState->flushPacket();
+          videoState->clearVideoPacketRead();
+          videoState->pushVideoPacketRead(flushPacket);
         }
 
         if (audioStreamIndex >= 0)
         {
-          videoState->audioq.flush();
-          videoState->audioq.put(videoState->flush_pkt);
+          auto& flushPacket = videoState->flushPacket();
+          videoState->clearAudioPacketRead();
+          videoState->pushAudioPacketRead(flushPacket);
         }
-        videoState->seek_req = 0;
+        videoState->setSeekRequest(0);
       }
     }
 
     // check audio and video packets queues size
-    if (videoState->audioq.size + videoState->videoq.size > MAX_QUEUE_SIZE)
+    if (videoState->sizeAudioPacketRead() + videoState->sizeVideoPacketRead() > MAX_QUEUE_SIZE)
     {
       // wait for audio and video queues to decrease size
       SDL_Delay(10);
@@ -216,7 +206,7 @@ int VideoReader::readThread(std::shared_ptr<VideoState> vs)
       if (ret == AVERROR_EOF)
       {
         // wait for the rest of the program to end
-        while (videoState->videoq.nb_packets > 0 && videoState->audioq.nb_packets > 0)
+        while (videoState->nbPacketsAudioRead() > 0 && videoState->nbPacketsVideoRead() > 0)
         {
           SDL_Delay(10);
         }
@@ -248,13 +238,13 @@ int VideoReader::readThread(std::shared_ptr<VideoState> vs)
     }
     else
     {
-      // otherwise free the memory
+      // Otherwise free the memory
       av_packet_unref(packet);
     }
   }
 
-  // wait for the rest of the program to end
-  while (!videoState->quit)
+  // Wait for the rest of the program to end
+  while (!videoState->isPlayerFinished())
   {
     SDL_Delay(100);
   }
@@ -312,8 +302,8 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
     wants.userdata = vs.get();
 
     // open audio device
-    auto& outputAudioDeviceIndex = vs->outputAudioDeviceIndex();
-    auto& sdlAudioDeviceID = vs->sdlAudioDeviceID();
+    auto outputAudioDeviceIndex = vs->outputAudioDeviceIndex();
+    auto sdlAudioDeviceID = vs->sdlAudioDeviceID();
     sdlAudioDeviceID = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(outputAudioDeviceIndex, 0), false, &wants, &spec, 0);
     if (sdlAudioDeviceID <= 0)
     {
@@ -336,10 +326,8 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
       // zero out the block of memory pointed
       std::memset(&vs->audio_pkt, 0, sizeof(vs->audio_pkt));
 
-      // init audio pkt queue
-      vs->audioq.init();
-
       // start playing audio device
+      auto sdlAudioDeviceID = vs->sdlAudioDeviceID();
       SDL_PauseAudioDevice(sdlAudioDeviceID, 0);
     }
     break;
@@ -348,51 +336,31 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
     {
       // !!! Don't forget to init the frame timer
       // previous frame delay: 1ms = 1e-6s
-      videoState->frame_timer = (double)av_gettime() / 1000000.0;
-      videoState->frame_last_delay = 40e-3;
-      videoState->video_current_pts_time = av_gettime();
-
-      // init video packet queue
-      videoState->videoq.init();
+      vs->setFrameDecodeTimer((double)av_gettime() / 1000000.0);
+      vs->setFrameDecodeLastDelay(40e-3);
+      vs->setVideoDecodeCurrentPtsTime(av_gettime());
 
       // start video thread
-      m_videoDecoder = new VideoDecoder();
-      m_videoDecoder->start(videoState);
+      m_videoDecoder = std::make_unique<VideoDecoder>();
+      m_videoDecoder->start(vs);
 
       // set up the videostate swscontext to convert the image data to yuv420
-      videoState->sws_ctx = sws_getContext(
-        videoState->video_ctx->width
-        , videoState->video_ctx->height
-        , videoState->video_ctx->pix_fmt
-        , videoState->video_ctx->width
-        , videoState->video_ctx->height
+      auto& decodeVideoSwsCtx = vs->decodeVideoSwsCtx();
+      auto& videoCodecCtx = vs->videoCodecCtx();
+      decodeVideoSwsCtx = sws_getContext(
+        videoCodecCtx->width
+        , videoCodecCtx->height
+        , videoCodecCtx->pix_fmt
+        , videoCodecCtx->width
+        , videoCodecCtx->height
         , AV_PIX_FMT_YUV420P
         , SWS_BILINEAR
         , nullptr
         , nullptr
         , nullptr);
-      // init sdl_surface mutex ref
-      videoState->screen_mutex = SDL_CreateMutex();
-
     }
     break;
-
-    default:
-    {
-      // nothing
-    }
   }
-  return 0;
-}
-
-int VideoReader::releaseAll()
-{
-  if (packet)
-  {
-    av_packet_free(&packet);
-  }
-  packet = nullptr;
-
   return 0;
 }
 

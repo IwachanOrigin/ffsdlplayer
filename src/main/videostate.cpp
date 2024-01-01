@@ -4,6 +4,12 @@
 
 using namespace player;
 
+VideoState::VideoState()
+{
+  // init sdl_surface mutex ref
+  m_screenMutex = SDL_CreateMutex();
+}
+
 VideoState::~VideoState()
 {
   if (m_flushPkt)
@@ -188,6 +194,28 @@ int VideoState::queuePicture(AVFrame* pFrame, const double& pts)
   }
 
   return 0;
+}
+
+int VideoState::pushAudioPacketRead(AVPacket* packet)
+{
+  return m_audioPacketQueue.push(packet);
+}
+
+int VideoState::pushVideoPacketRead(AVPacket* packet)
+{
+  return m_videoPacketQueue.push(packet);
+}
+
+int VideoState::popAudioPacketRead(AVPacket* packet)
+{
+  int ret = m_audioPacketQueue.pop(packet);
+  return (packet == nullptr) ? -1 : ret;
+}
+
+int VideoState::popVideoPacketRead(AVPacket* packet)
+{
+  int ret = m_videoPacketQueue.pop(packet);
+  return (packet == nullptr) ? -1 : ret;
 }
 
 double VideoState::masterClock()
