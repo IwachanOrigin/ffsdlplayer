@@ -30,7 +30,6 @@ public:
   int size() const { return m_size; }
   int nbPackets() const { return m_nbPackets; }
 
-
 private:
   std::queue<MyAVPacketList*> m_myAvPacketListQueue;
   int m_frameNumber;

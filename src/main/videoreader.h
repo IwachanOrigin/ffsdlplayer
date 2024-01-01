@@ -39,8 +39,10 @@ private:
   std::shared_ptr<VideoState> m_videoState;
   std::unique_ptr<VideoDecoder> m_videoDecoder;
   std::unique_ptr<VideoRenderer> m_videoRenderer;
+  std::string m_filename = "";
 
   int streamComponentOpen(std::shared_ptr<VideoState> vs, const int& streamIndex);
+  int releaseAll();
   int readThread(std::shared_ptr<VideoState> vs);
 };
 

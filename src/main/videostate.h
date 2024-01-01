@@ -52,6 +52,11 @@ public:
   AVStream*& videoStream() { return m_videoStream; }
   AVCodecContext*& audioCodecCtx() { return m_audioCtx; }
   AVStream*& audioStream() { return m_audioStream; }
+  int& outputAudioDeviceIndex() { return m_outputAudioDeviceIndex; }
+  void setOutputAudioDeviceIndex(const int& outputAudioDeviceIndex) { m_outputAudioDeviceIndex = outputAudioDeviceIndex; }
+  int& sdlAudioDeviceID() { return m_sdlAudioDeviceID; }
+  void setSdlAudioDeviceID(const int& audioDeviceID) { m_sdlAudioDeviceID = audioDeviceID; };
+  int queuePicture(AVFrame* pFrame, const double& pts);
 
   // For Read
   int pushAudioPacketRead(AVPacket* packet);
@@ -80,11 +85,11 @@ public:
   int64_t videoDecodeCurrentPtsTime() const { return m_videoDecodeCurrentPtsTime; }
   void setVideoDecodeCurrentPtsTime(const int64_t& videoCurrentPtsTime) { m_videoDecodeCurrentPtsTime = videoCurrentPtsTime; }
 
-
-
-  int queuePicture(AVFrame* pFrame, const double& pts);
-
+  // For calculate clock.
   double masterClock();
+
+  // For Seek
+  int& seekRequest() { return m_seekReq; }
   void streamSeek(const int64_t& pos, const int& rel);
 
 private:
@@ -92,7 +97,6 @@ private:
   double calcVideoClock();
   double calcAudioClock();
   double calcExternalClock();
-
 
   AVFormatContext* m_formatCtx = nullptr;
 
@@ -150,14 +154,12 @@ private:
   SDL_mutex* pictq_mutex = nullptr;
   SDL_cond* pictq_cond = nullptr;
 
-  // file name
-  std::string m_filename;
-
-  // output audio device index
-  int m_outputAudioDeviceIndex;
+  // output audio device index in windows
+  int m_outputAudioDeviceIndex = -1;
+  int m_sdlAudioDeviceID = -1;
 
   //
-  AVPacket* m_flushPkt;
+  AVPacket* m_flushPkt = nullptr;
 
 };
 

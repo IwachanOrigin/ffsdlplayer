@@ -10,7 +10,51 @@ VideoState::~VideoState()
   {
     // wipe the packet
     av_packet_unref(m_flushPkt);
+    av_packet_free(&m_flushPkt);
+    m_flushPkt = nullptr;
   }
+
+  if (m_formatCtx)
+  {
+    // close the opened input avformatcontext
+    avformat_close_input(&m_formatCtx);
+    m_formatCtx = nullptr;
+  }
+
+  if (m_videoPacketQueue.size() > 0)
+  {
+    m_videoPacketQueue.clear();
+  }
+
+  if (m_audioPacketQueue.size() > 0)
+  {
+    m_audioPacketQueue.clear();
+  }
+
+  if (m_audioCtx)
+  {
+    avcodec_free_context(&m_audioCtx);
+    m_audioCtx = nullptr;
+  }
+
+  if (m_videoCtx)
+  {
+    avcodec_free_context(&m_videoCtx);
+    m_videoCtx = nullptr;
+  }
+
+  // device stop, memory release
+  if (m_sdlAudioDeviceID > 0)
+  {
+    SDL_LockAudioDevice(m_sdlAudioDeviceID);
+    SDL_PauseAudioDevice(m_sdlAudioDeviceID, 1);
+    SDL_UnlockAudioDevice(m_sdlAudioDeviceID);
+
+    SDL_CloseAudioDevice(m_sdlAudioDeviceID);
+  }
+  m_sdlAudioDeviceID = -1;
+
+  SDL_Quit();
 }
 
 void VideoState::allocPicture()
