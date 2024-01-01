@@ -40,8 +40,8 @@ private:
   std::unique_ptr<VideoDecoder> m_videoDecoder;
   std::unique_ptr<VideoRenderer> m_videoRenderer;
 
-  int stream_component_open(std::shared_ptr<VideoState> vs, const int& stream_index);
-  int read_thread(std::shared_ptr<VideoState> vs);
+  int streamComponentOpen(std::shared_ptr<VideoState> vs, const int& streamIndex);
+  int readThread(std::shared_ptr<VideoState> vs);
 };
 
 }

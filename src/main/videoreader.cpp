@@ -2,6 +2,7 @@
 #include <cstring>
 #include <thread>
 
+#include "videostate.h"
 #include "videoreader.h"
 
 #include "videodecoder.h"
@@ -30,19 +31,18 @@ int VideoReader::start(const std::string& filename, const int& audioDeviceIndex)
   // start read thread
   std::thread([&](VideoReader *reader)
   {
-    reader->read_thread(m_videoState);
+    reader->readThread(m_videoState);
   }, this).detach();
 
   return 0;
 }
 
-int VideoReader::read_thread(void *arg)
+int VideoReader::readThread(std::shared_ptr<VideoState> vs)
 {
   int ret = -1;
 
   // retrieve global VideoState reference
-  VideoState *videoState = (VideoState *)arg;
-  videoState->quit = 0;
+  auto videoState = vs;
 
   // video and audio stream indexes
   int videoStream = -1;
@@ -104,7 +104,7 @@ int VideoReader::read_thread(void *arg)
   else
   {
     // open video stream
-    ret = stream_component_open(videoState, videoStream);
+    ret = streamComponentOpen(videoState, videoStream);
 
     // check video codec was opened correctly
     if (ret < 0)
@@ -113,7 +113,7 @@ int VideoReader::read_thread(void *arg)
       goto fail;
     }
 
-    m_videoRenderer = new VideoRenderer();
+    m_videoRenderer = std::make_unique<VideoRenderer>();
     m_videoRenderer->start(videoState);
   }
 
@@ -126,7 +126,7 @@ int VideoReader::read_thread(void *arg)
   else
   {
     // open audio stream component codec
-    ret = stream_component_open(videoState, audioStream);
+    ret = streamComponentOpen(videoState, audioStream);
 
     // check audio codec was opened correctly
     if (ret < 0)
@@ -331,13 +331,13 @@ fail:
   return 0;
 }
 
-int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
+int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& streamIndex)
 {
   // retrieve file I/O context
-  AVFormatContext *pFormatCtx = videoState->pFormatCtx;
+  auto pFormatCtx = vs->pFormatCtx;
 
   // check the given stream index in valid
-  if (stream_index < 0 || stream_index >= pFormatCtx->nb_streams)
+  if (streamIndex < 0 || streamIndex >= pFormatCtx->nb_streams)
   {
     std::cerr << "invalid stream index" << std::endl;
     return -1;
@@ -345,7 +345,7 @@ int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
 
   // retrieve codec for the given stream index
   const AVCodec* codec = nullptr;
-  codec = avcodec_find_decoder(pFormatCtx->streams[stream_index]->codecpar->codec_id);
+  codec = avcodec_find_decoder(pFormatCtx->streams[streamIndex]->codecpar->codec_id);
   if (codec == nullptr)
   {
     std::cerr << "unsupported codec" << std::endl;
@@ -362,7 +362,7 @@ int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
   //codecCtx->thread_count = 4;
   //codecCtx->thread_type = FF_THREAD_FRAME;
 
-  int ret = avcodec_parameters_to_context(codecCtx, pFormatCtx->streams[stream_index]->codecpar);
+  int ret = avcodec_parameters_to_context(codecCtx, pFormatCtx->streams[streamIndex]->codecpar);
   if (ret != 0)
   {
     std::cerr << "Could not copy codec context" << std::endl;
@@ -371,8 +371,8 @@ int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
 
   if (codecCtx->codec_type == AVMEDIA_TYPE_AUDIO)
   {
-    SDL_AudioSpec wants;
-    SDL_AudioSpec spec;
+    SDL_AudioSpec wants{};
+    SDL_AudioSpec spec{};
 
     wants.freq = codecCtx->sample_rate;
     wants.format = AUDIO_S16SYS;
@@ -380,7 +380,7 @@ int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
     wants.silence = 0;
     wants.samples = SDL_AUDIO_BUFFER_SIZE;
     wants.callback = audio_callback;
-    wants.userdata = videoState;
+    wants.userdata = vs.get();
 
     // open audio device
     deviceID = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(m_videoState->output_audio_device_index, 0), false, &wants, &spec, 0);
@@ -402,18 +402,18 @@ int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
     case AVMEDIA_TYPE_AUDIO:
     {
       // set videostate audio
-      videoState->audioStream = stream_index;
-      videoState->audio_st = pFormatCtx->streams[stream_index];
-      videoState->audio_ctx = codecCtx;
-      videoState->audio_buf_size = 0;
-      videoState->audio_buf_index = 0;
-      videoState->av_sync_type = DEFAULT_AV_SYNC_TYPE;
+      vs->audioStream = streamIndex;
+      vs->audio_st = pFormatCtx->streams[streamIndex];
+      vs->audio_ctx = codecCtx;
+      vs->audio_buf_size = 0;
+      vs->audio_buf_index = 0;
+      vs->av_sync_type = DEFAULT_AV_SYNC_TYPE;
 
       // zero out the block of memory pointed
-      std::memset(&videoState->audio_pkt, 0, sizeof(videoState->audio_pkt));
+      std::memset(&vs->audio_pkt, 0, sizeof(vs->audio_pkt));
 
       // init audio pkt queue
-      videoState->audioq.init();
+      vs->audioq.init();
 
       // start playing audio device
       SDL_PauseAudioDevice(deviceID, 0);
@@ -423,8 +423,8 @@ int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
     case AVMEDIA_TYPE_VIDEO:
     {
       // set videostate video
-      videoState->videoStream = stream_index;
-      videoState->video_st = pFormatCtx->streams[stream_index];
+      videoState->videoStream = streamIndex;
+      videoState->video_st = pFormatCtx->streams[streamIndex];
       videoState->video_ctx = codecCtx;
 
       // !!! Don't forget to init the frame timer
@@ -441,16 +441,17 @@ int VideoReader::stream_component_open(VideoState *videoState, int stream_index)
       m_videoDecoder->start(videoState);
 
       // set up the videostate swscontext to convert the image data to yuv420
-      videoState->sws_ctx = sws_getContext(videoState->video_ctx->width
-                                           , videoState->video_ctx->height
-                                           , videoState->video_ctx->pix_fmt
-                                           , videoState->video_ctx->width
-                                           , videoState->video_ctx->height
-                                           , AV_PIX_FMT_YUV420P
-                                           , SWS_BILINEAR
-                                           , nullptr
-                                           , nullptr
-                                           , nullptr);
+      videoState->sws_ctx = sws_getContext(
+        videoState->video_ctx->width
+        , videoState->video_ctx->height
+        , videoState->video_ctx->pix_fmt
+        , videoState->video_ctx->width
+        , videoState->video_ctx->height
+        , AV_PIX_FMT_YUV420P
+        , SWS_BILINEAR
+        , nullptr
+        , nullptr
+        , nullptr);
       // init sdl_surface mutex ref
       videoState->screen_mutex = SDL_CreateMutex();
 
