@@ -22,17 +22,22 @@ extern "C"
 
 namespace player
 {
-#define SDL_AUDIO_BUFFER_SIZE 1024
-#define MAX_AUDIO_FRAME_SIZE  192000
-#define AV_NOSYNC_THRESHOLD   1.0
-#define AUDIO_DIFF_AVG_NB     20
-#define SAMPLE_CORRECTION_PERCENT_MAX 10
+
+class AudioDecoder
+{
+public:
+  explicit AudioDecoder() = default;
+  ~AudioDecoder() = default;
 
   void audioCallback(void* userdata, Uint8* stream, int len);
-  int audioDecodeFrame(VideoState* videoState, uint8_t* audio_buf, int buf_size, double* pts_ptr);
-  static int audioResampling(VideoState* videoState, AVFrame* decoded_audio_frame, enum AVSampleFormat out_sample_fmt, uint8_t* out_buf);
-  int syncAudio(VideoState* videoState, short* samples, int samples_size);
+
+private:
+  int audioDecodeFrame(VideoState* vs, uint8_t* audio_buf, int buf_size, double& pts_ptr);
+  int audioResampling(VideoState* vs, AVFrame* decodedAudioFrame, AVSampleFormat outSampleFmt, uint8_t* outBuf);
+  int syncAudio(VideoState* vs, short* samples, int& samples_size);
   void releasePointer(AudioReSamplingState& arState);
+};
+
 }
 
 #endif // AUDIO_DECODER_H_

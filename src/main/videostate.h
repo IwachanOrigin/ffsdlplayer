@@ -103,6 +103,7 @@ public:
 
   // For calculate clock.
   double masterClock();
+  double calcAudioClock(); // For AudioDecoder
 
   // For Seek
   int seekRequest() const { return m_seekReq; }
@@ -114,7 +115,6 @@ public:
 private:
   void allocPicture();
   double calcVideoClock();
-  double calcAudioClock();
   double calcExternalClock();
 
   AVFormatContext* m_formatCtx = nullptr;

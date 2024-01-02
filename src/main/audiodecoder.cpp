@@ -6,10 +6,16 @@
 
 using namespace player;
 
-void audioCallback(void *userdata, Uint8 *stream, int len)
+#define SDL_AUDIO_BUFFER_SIZE 1024
+#define MAX_AUDIO_FRAME_SIZE  192000
+#define AV_NOSYNC_THRESHOLD   1.0
+#define AUDIO_DIFF_AVG_NB     20
+#define SAMPLE_CORRECTION_PERCENT_MAX 10
+
+void AudioDecoder::audioCallback(void* userdata, Uint8* stream, int len)
 {
   // retrieve the videostate
-  VideoState *videoState = (VideoState *) userdata;
+  VideoState* videoState = (VideoState *) userdata;
 
   int len1 = -1;
   int audio_size = -1;
@@ -18,16 +24,10 @@ void audioCallback(void *userdata, Uint8 *stream, int len)
 
   while (len > 0)
   {
-    // check global quit flag
-    if (videoState->quit)
-    {
-      return;
-    }
-
     if (videoState->audio_buf_index >= videoState->audio_buf_size)
     {
       // we have already sent all avaialble data; get more
-      audio_size = audioDecodeFrame(videoState, videoState->audio_buf, sizeof(videoState->audio_buf), &pts);
+      audio_size = audioDecodeFrame(videoState, videoState->audio_buf, sizeof(videoState->audio_buf), pts);
 
       if (audio_size < 0)
       {
@@ -62,18 +62,16 @@ void audioCallback(void *userdata, Uint8 *stream, int len)
   }
 }
 
-int audioDecodeFrame(VideoState *videoState, uint8_t *audio_buf, int buf_size, double *pts_ptr)
+int AudioDecoder::audioDecodeFrame(VideoState* vs, uint8_t *audio_buf, int buf_size, double& pts_ptr)
 {
-  AVPacket *avPacket = av_packet_alloc();
-  static uint8_t *audio_pkt_data = nullptr;
+  AVPacket* avPacket = av_packet_alloc();
+  static uint8_t* audio_pkt_data = nullptr;
   static int audio_pkt_size = 0;
 
-  double pts = 0;
   int n = 0;
 
   // allocate a new frame, used to decode audio packets
-  static AVFrame *avFrame = nullptr;
-  avFrame = av_frame_alloc();
+  AVFrame* avFrame = av_frame_alloc();
   if (!avFrame)
   {
     return -1;
@@ -82,21 +80,15 @@ int audioDecodeFrame(VideoState *videoState, uint8_t *audio_buf, int buf_size, d
   int len1 = 0;
   int data_size = 0;
 
+  auto& audioCodecCtx = vs->audioCodecCtx();
+
   for (;;)
   {
-    // check global quit flag
-    if (videoState->quit)
-    {
-      av_frame_unref(avFrame);
-      avFrame = nullptr;
-      return -1;
-    }
-
     while (audio_pkt_size > 0)
     {
       int got_frame = 0;
 
-      int ret = avcodec_receive_frame(videoState->audio_ctx, avFrame);
+      int ret = avcodec_receive_frame(audioCodecCtx, avFrame);
       if (ret == 0)
       {
         got_frame = 1;
@@ -109,7 +101,7 @@ int audioDecodeFrame(VideoState *videoState, uint8_t *audio_buf, int buf_size, d
 
       if (ret == 0)
       {
-        ret = avcodec_send_packet(videoState->audio_ctx, avPacket);
+        ret = avcodec_send_packet(audioCodecCtx, avPacket);
       }
 
       if (ret == AVERROR(EAGAIN))
@@ -140,9 +132,9 @@ int audioDecodeFrame(VideoState *videoState, uint8_t *audio_buf, int buf_size, d
       {
         // audio resampling
         data_size = audioResampling(
-          videoState
+          vs
           , avFrame
-          , AV_SAMPLE_FMT_S16
+          , AVSampleFormat::AV_SAMPLE_FMT_S16
           , audio_buf);
 
         assert(data_size <= buf_size);
@@ -155,10 +147,11 @@ int audioDecodeFrame(VideoState *videoState, uint8_t *audio_buf, int buf_size, d
       }
 
       // keep audio_clock up to date
-      pts = videoState->audio_clock;
-      *pts_ptr = pts;
-      n = 2 * videoState->audio_ctx->ch_layout.nb_channels;
-      videoState->audio_clock += (double)data_size / (double)(n * videoState->audio_ctx->sample_rate);
+      auto audioClock = vs->audioClock();
+      pts_ptr = audioClock;
+      n = 2 * audioCodecCtx->ch_layout.nb_channels;
+      audioClock += (double)data_size / (double)(n * audioCodecCtx->sample_rate);
+      vs->setAudioClock(audioClock);
 
       if (avPacket->data)
       {
@@ -177,7 +170,7 @@ int audioDecodeFrame(VideoState *videoState, uint8_t *audio_buf, int buf_size, d
     }
 
     // get more audio AVPacket
-    int ret = videoState->audioq.get(avPacket, 1);
+    int ret = vs->popAudioPacketRead(avPacket);
 
     // if packet_queue_get returns < 0, the global quit flag was set
     if (ret < 0)
@@ -185,9 +178,10 @@ int audioDecodeFrame(VideoState *videoState, uint8_t *audio_buf, int buf_size, d
       return -1;
     }
 
-    if (avPacket->data == videoState->flush_pkt->data)
+    auto& flushPacket = vs->flushPacket();
+    if (avPacket->data == flushPacket->data)
     {
-      avcodec_flush_buffers(videoState->audio_ctx);
+      avcodec_flush_buffers(audioCodecCtx);
       continue;
     }
 
@@ -197,7 +191,9 @@ int audioDecodeFrame(VideoState *videoState, uint8_t *audio_buf, int buf_size, d
     // keep audio_clock up to date
     if (avPacket->pts != AV_NOPTS_VALUE)
     {
-      videoState->audio_clock = av_q2d(videoState->audio_st->time_base) * avPacket->pts;
+      auto& audioStream = vs->audioStream();
+      auto audioClock = av_q2d(audioStream->time_base) * avPacket->pts;
+      vs->setAudioClock(audioClock);
     }
   }
 
@@ -206,14 +202,16 @@ int audioDecodeFrame(VideoState *videoState, uint8_t *audio_buf, int buf_size, d
   return 0;
 }
 
-int audioResampling(VideoState* videoState
-                    , AVFrame* decoded_audio_frame
-                    , enum AVSampleFormat out_sample_fmt
-                    , uint8_t* out_buf)
+int AudioDecoder::audioResampling(
+  VideoState* vs
+  , AVFrame* decoded_audio_frame
+  , AVSampleFormat out_sample_fmt
+  , uint8_t* out_buf)
 {
   // get an instance of the audioresamplingstate struct
   AudioReSamplingState arState;
-  arState.init(videoState->audio_ctx->ch_layout.nb_channels);
+  auto& audioCodecCtx = vs->audioCodecCtx();
+  arState.init(audioCodecCtx->ch_layout.nb_channels);
   if (!arState.swr_ctx)
   {
     printf("swr_alloc error.\n");
@@ -221,7 +219,7 @@ int audioResampling(VideoState* videoState
   }
 
   // get input audio channels
-  arState.in_channel_layout = videoState->audio_ctx->ch_layout.nb_channels;
+  arState.in_channel_layout = audioCodecCtx->ch_layout.nb_channels;
 
   // check input audio channels correctly retrieved
   if (arState.in_channel_layout <= 0)
@@ -231,11 +229,11 @@ int audioResampling(VideoState* videoState
   }
 
   // set output audio channels based on the input audio channels
-  if (videoState->audio_ctx->ch_layout.nb_channels == 1)
+  if (audioCodecCtx->ch_layout.nb_channels == 1)
   {
     arState.out_channel_layout = AV_CH_LAYOUT_MONO;
   }
-  else if (videoState->audio_ctx->ch_layout.nb_channels == 2)
+  else if (audioCodecCtx->ch_layout.nb_channels == 2)
   {
     arState.out_channel_layout = AV_CH_LAYOUT_STEREO;
   }
@@ -255,10 +253,10 @@ int audioResampling(VideoState* videoState
 
   // Set SwrContext parameters for resampling
   av_opt_set_int(arState.swr_ctx, "in_channel_layout", arState.in_channel_layout, 0);
-  av_opt_set_int(arState.swr_ctx, "in_sample_rate", videoState->audio_ctx->sample_rate, 0);
-  av_opt_set_sample_fmt(arState.swr_ctx, "in_sample_fmt", videoState->audio_ctx->sample_fmt, 0);
+  av_opt_set_int(arState.swr_ctx, "in_sample_rate", audioCodecCtx->sample_rate, 0);
+  av_opt_set_sample_fmt(arState.swr_ctx, "in_sample_fmt", audioCodecCtx->sample_fmt, 0);
   av_opt_set_int(arState.swr_ctx, "out_channel_layout", arState.out_channel_layout, 0);
-  av_opt_set_int(arState.swr_ctx, "out_sample_rate", videoState->audio_ctx->sample_rate, 0);
+  av_opt_set_int(arState.swr_ctx, "out_sample_rate", audioCodecCtx->sample_rate, 0);
   av_opt_set_sample_fmt(arState.swr_ctx, "out_sample_fmt", out_sample_fmt, 0);
 
   // Once all values have been set for the SwrContext, it must be initialized
@@ -273,8 +271,8 @@ int audioResampling(VideoState* videoState
 
   arState.max_out_nb_samples = arState.out_nb_samples = av_rescale_rnd(
     arState.in_nb_samples,
-    videoState->audio_ctx->sample_rate,
-    videoState->audio_ctx->sample_rate,
+    audioCodecCtx->sample_rate,
+    audioCodecCtx->sample_rate,
     AV_ROUND_UP
     );
 
@@ -287,7 +285,7 @@ int audioResampling(VideoState* videoState
   }
 
   // get number of output audio channels
-  arState.out_nb_channels = videoState->audio_ctx->ch_layout.nb_channels;
+  arState.out_nb_channels = audioCodecCtx->ch_layout.nb_channels;
 
   ret = av_samples_alloc_array_and_samples(
     &arState.resampled_data,
@@ -306,10 +304,11 @@ int audioResampling(VideoState* videoState
   }
 
   // retrieve output samples number taking into account the progressive delay
+  auto swrDelay = swr_get_delay(arState.swr_ctx, audioCodecCtx->sample_rate);
   arState.out_nb_samples = av_rescale_rnd(
-    swr_get_delay(arState.swr_ctx, videoState->audio_ctx->sample_rate) + arState.in_nb_samples
-    , videoState->audio_ctx->sample_rate
-    , videoState->audio_ctx->sample_rate
+    swrDelay + arState.in_nb_samples
+    , audioCodecCtx->sample_rate
+    , audioCodecCtx->sample_rate
     , AV_ROUND_UP
     );
 
@@ -397,23 +396,23 @@ int audioResampling(VideoState* videoState
   return arState.resampled_data_size;
 }
 
-int syncAudio(VideoState *videoState, short *samples, int samples_size)
+int AudioDecoder::syncAudio(VideoState* vs, short* samples, int& samples_size)
 {
   int n = 0;
   double ref_clock = 0;
-
-  n = 2 * videoState->audio_ctx->ch_layout.nb_channels;
+  auto& audioCodecCtx = vs->audioCodecCtx();
+  n = 2 * audioCodecCtx->ch_layout.nb_channels;
 
   // check
-  if (videoState->av_sync_type != SYNC_TYPE::AV_SYNC_AUDIO_MASTER)
+  if (vs->av_sync_type != SYNC_TYPE::AV_SYNC_AUDIO_MASTER)
   {
     double diff = 0;
     double avg_diff = 0;
     int wanted_size = 0;
     int min_size = 0;
     int max_size = 0;
-    ref_clock = videoState->getMasterClock();
-    diff = videoState->getAudioClock() - ref_clock;
+    ref_clock = vs->masterClock();
+    diff = vs->calcAudioClock() - ref_clock;
 
     if (diff < AV_NOSYNC_THRESHOLD)
     {
@@ -479,7 +478,7 @@ int syncAudio(VideoState *videoState, short *samples, int samples_size)
   return samples_size;
 }
 
-void releasePointer(AudioReSamplingState& arState)
+void AudioDecoder::releasePointer(AudioReSamplingState& arState)
 {
   /*
    * Memory Cleanup.
