@@ -111,8 +111,6 @@ int VideoRenderer::displayThread()
       case FF_QUIT_EVENT:
       case SDL_QUIT:
       {
-        SDL_CondSignal(m_vs->audioq.cond);
-        SDL_CondSignal(m_vs->videoq.cond);
         m_vs->setPlayerFinished();
       }
       break;
@@ -125,12 +123,23 @@ int VideoRenderer::displayThread()
     }
   }
 
-  SDL_DestroyTexture(m_texture);
-  m_texture = nullptr;
-  SDL_DestroyRenderer(m_renderer);
-  m_renderer = nullptr;
-  SDL_DestroyWindow(m_screen);
-  m_screen = nullptr;
+  if (m_texture)
+  {
+    SDL_DestroyTexture(m_texture);
+    m_texture = nullptr;
+  }
+  
+  if (m_renderer)
+  {
+    SDL_DestroyRenderer(m_renderer);
+    m_renderer = nullptr;
+  }
+  
+  if (m_screen)
+  {
+    SDL_DestroyWindow(m_screen);
+    m_screen = nullptr;
+  }
 
   return 0;
 }
@@ -147,9 +156,6 @@ void VideoRenderer::scheduleRefresh(int delay)
 
 void VideoRenderer::videoRefreshTimer()
 {
-  // we will later see how to property use this
-  VideoPicture* videoPicture = nullptr;
-
   // used for video frames display delay and audio video sync
   double pts_delay = 0;
   double audio_ref_clock = 0;
@@ -162,18 +168,19 @@ void VideoRenderer::videoRefreshTimer()
   if (videoStream)
   {
     // check the videopicture queue contains decoded frames
-    if (m_vs->pictq_size == 0)
+    auto& pictureQueueSize = m_vs->videoPictureQueueSize();
+    if (pictureQueueSize == 0)
     {
       this->scheduleRefresh(1);
     }
     else
     {
-      // get videopicture reference using the queue read index
-      videoPicture = &m_vs->pictq[m_vs->pictq_rindex];
+      // Get videopicture reference using the queue read index
+      auto& videoPicture = m_vs->videoPicture();
 
       // get last frame pts
       auto frameDecodeLastPts = m_vs->frameDecodeLastPts();
-      pts_delay = videoPicture->pts - frameDecodeLastPts;
+      pts_delay = videoPicture.pts - frameDecodeLastPts;
 
       // if the obtained delay is incorrect
       if (pts_delay <= 0 || pts_delay >= 1.0)
@@ -184,12 +191,11 @@ void VideoRenderer::videoRefreshTimer()
 
       // save delay information for the next time
       m_vs->setFrameDecodeLastDelay(pts_delay);
-      m_vs->setFrameDecodeLastPts(videoPicture->pts);
+      m_vs->setFrameDecodeLastPts(videoPicture.pts);
 
       // update delay to stay in sync with the audio
       audio_ref_clock = this->getAudioClock();
-
-      audio_video_delay = videoPicture->pts - audio_ref_clock;
+      audio_video_delay = videoPicture.pts - audio_ref_clock;
 
       // skip or repeat the frame taking into account the delay
       sync_threshold = (pts_delay > AV_SYNC_THRESHOLD) ? pts_delay : AV_SYNC_THRESHOLD;
@@ -222,22 +228,26 @@ void VideoRenderer::videoRefreshTimer()
       this->videoDisplay();
 
       // update read index for the next frame
-      if (++m_vs->pictq_rindex == VIDEO_PICTURE_QUEUE_SIZE)
+      auto& pictureQueueRIndex = m_vs->videoPictureQueueRIndex();
+      if (++pictureQueueRIndex == VIDEO_PICTURE_QUEUE_SIZE)
       {
-        m_vs->pictq_rindex = 0;
+        pictureQueueRIndex = 0;
       }
 
       // lock videopicture queue mutex
-      SDL_LockMutex(m_vs->pictq_mutex);
+      auto& pictureQueueMutex = m_vs->pictureQueueMutex();
+      SDL_LockMutex(pictureQueueMutex);
 
       // decrease videopicture queue size
-      m_vs->pictq_size--;
+      auto& pictureQueueSize = m_vs->videoPictureQueueSize();
+      pictureQueueSize--;
 
       // notify other threads waiting for the videoPicture queue
-      SDL_CondSignal(m_vs->pictq_cond);
+      auto& pictureQueueCond = m_vs->pictureQueueCond();
+      SDL_CondSignal(pictureQueueCond);
 
       // unlock videoPicture queue mutex
-      SDL_UnlockMutex(m_vs->pictq_mutex);
+      SDL_UnlockMutex(pictureQueueMutex);
     }
   }
   else
@@ -307,13 +317,13 @@ void VideoRenderer::videoDisplay()
       );
   }
   // reference for the next videopicture to be displayed
-  VideoPicture* videoPicture = nullptr;
   float aspect_ratio = 0;
   int w = 0, h = 0, x = 0, y = 0;
 
   // get next videoPicture to be displayed from the videopicture queue
-  videoPicture = &m_vs->pictq[m_vs->pictq_rindex];
-  if (videoPicture->frame)
+        // Get videopicture reference using the queue read index
+  auto& videoPicture = m_vs->videoPicture();
+  if (videoPicture.frame)
   {
     if (videoCodecCtx->sample_aspect_ratio.num == 0)
     {
@@ -371,12 +381,12 @@ void VideoRenderer::videoDisplay()
       SDL_UpdateYUVTexture(
         m_texture
         , &rect
-        , videoPicture->frame->data[0]
-        , videoPicture->frame->linesize[0]
-        , videoPicture->frame->data[1]
-        , videoPicture->frame->linesize[1]
-        , videoPicture->frame->data[2]
-        , videoPicture->frame->linesize[2]
+        , videoPicture.frame->data[0]
+        , videoPicture.frame->linesize[0]
+        , videoPicture.frame->data[1]
+        , videoPicture.frame->linesize[1]
+        , videoPicture.frame->data[2]
+        , videoPicture.frame->linesize[2]
         );
 
       // clear the current rendering target with the drawing color

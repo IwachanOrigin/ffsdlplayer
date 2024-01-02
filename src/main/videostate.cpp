@@ -8,6 +8,8 @@ VideoState::VideoState()
 {
   // init sdl_surface mutex ref
   m_screenMutex = SDL_CreateMutex();
+  m_pictqMutex = SDL_CreateMutex();
+  m_pictqCond = SDL_CreateCond();
 }
 
 VideoState::~VideoState()
@@ -49,6 +51,24 @@ VideoState::~VideoState()
     m_videoCtx = nullptr;
   }
 
+  if (m_screenMutex)
+  {
+    SDL_DestroyMutex(m_screenMutex);
+    m_screenMutex = nullptr;
+  }
+
+  if (m_pictqMutex)
+  {
+    SDL_DestroyMutex(m_pictqMutex);
+    m_pictqMutex = nullptr;
+  }
+
+  if (m_pictqCond)
+  {
+    SDL_DestroyCond(m_pictqCond);
+    m_pictqCond = nullptr;
+  }
+
   // device stop, memory release
   if (m_sdlAudioDeviceID > 0)
   {
@@ -68,14 +88,14 @@ void VideoState::allocPicture()
   m_flushPkt = av_packet_alloc();
   m_flushPkt->data = (uint8_t*)"FLUSH";
 
-  auto videoPicture = &pictq[m_pictqWindex];
+  auto videoPicture = m_pictureQueue[m_pictqWindex];
 
   // check if the sdl_overlay is allocated
-  if (videoPicture->frame)
+  if (videoPicture.frame)
   {
     // we already have an avframe allocated, free memory
-    av_frame_free(&videoPicture->frame);
-    av_free(videoPicture->frame);
+    av_frame_free(&videoPicture.frame);
+    av_free(videoPicture.frame);
   }
 
   // lock global screen mutex
@@ -94,16 +114,16 @@ void VideoState::allocPicture()
   auto buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
 
   // alloc the avframe later used to contain the scaled frame
-  videoPicture->frame = av_frame_alloc();
-  if (videoPicture->frame == nullptr)
+  videoPicture.frame = av_frame_alloc();
+  if (videoPicture.frame == nullptr)
   {
     return;
   }
 
   // the fields of the given image are filled in by using the buffer which points to the image data buffer
   av_image_fill_arrays(
-    videoPicture->frame->data
-    , videoPicture->frame->linesize
+    videoPicture.frame->data
+    , videoPicture.frame->linesize
     , buffer
     , AV_PIX_FMT_YUV420P
     , m_videoCtx->width
@@ -115,26 +135,26 @@ void VideoState::allocPicture()
   SDL_UnlockMutex(m_screenMutex);
 
   // update videoPicture struct fields
-  videoPicture->width = m_videoCtx->width;
-  videoPicture->height = m_videoCtx->height;
-  videoPicture->allocated = 1;
+  videoPicture.width = m_videoCtx->width;
+  videoPicture.height = m_videoCtx->height;
+  videoPicture.allocated = 1;
 }
 
 int VideoState::queuePicture(AVFrame* pFrame, const double& pts)
 {
   // lock videostate pictq mutex
-  SDL_LockMutex(pictq_mutex);
+  SDL_LockMutex(m_pictqMutex);
 
   // wait until we have space for a new picture in pictq
   while (m_pictqSize >= VIDEO_PICTURE_QUEUE_SIZE)
   {
-    SDL_CondWait(pictq_cond, pictq_mutex);
+    SDL_CondWait(m_pictqCond, m_pictqMutex);
   }
 
   // unlock pictq mutex
-  SDL_UnlockMutex(pictq_mutex);
+  SDL_UnlockMutex(m_pictqMutex);
 
-  auto videoPicture = &pictq[m_pictqWindex];
+  auto videoPicture = &m_pictureQueue[m_pictqWindex];
 
   // if the videopicture sdl_overlay is not allocated or has a different width, height
   if (!videoPicture->frame ||
@@ -184,13 +204,13 @@ int VideoState::queuePicture(AVFrame* pFrame, const double& pts)
     }
 
     // lock videopicture queue
-    SDL_LockMutex(pictq_mutex);
+    SDL_LockMutex(m_pictqMutex);
 
     // increase videopictq queue size
     m_pictqSize++;
 
     // unlock videopicture queue
-    SDL_UnlockMutex(pictq_mutex);
+    SDL_UnlockMutex(m_pictqMutex);
   }
 
   return 0;

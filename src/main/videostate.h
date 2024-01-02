@@ -57,9 +57,15 @@ public:
   void setOutputAudioDeviceIndex(const int& outputAudioDeviceIndex) { m_outputAudioDeviceIndex = outputAudioDeviceIndex; }
   SDL_AudioDeviceID sdlAudioDeviceID() const { return m_sdlAudioDeviceID; }
   void setSdlAudioDeviceID(const SDL_AudioDeviceID& audioDeviceID) { m_sdlAudioDeviceID = audioDeviceID; };
-  int queuePicture(AVFrame* pFrame, const double& pts);
   bool isPlayerFinished() const { return m_isPlayerFinished; }
   void setPlayerFinished() { m_isPlayerFinished = true; }
+  int& videoPictureQueueSize() { return m_pictqSize; }
+  int& videoPictureQueueRIndex() { return m_pictqRindex; }
+  int& videoPictureQueueWIndex() { return m_pictqWindex; }
+  VideoPicture& videoPicture() { return m_pictureQueue[m_pictqRindex]; }
+  SDL_mutex*& pictureQueueMutex() { return m_pictqMutex; }
+  SDL_cond*& pictureQueueCond() { return m_pictqCond; }
+  int queuePicture(AVFrame* pFrame, const double& pts);
 
   // For Read
   int pushAudioPacketRead(AVPacket* packet);
@@ -157,12 +163,13 @@ private:
   int64_t m_seekPos = 0;
 
   // video picture queue
-  VideoPicture pictq[VIDEO_PICTURE_QUEUE_SIZE];
+  VideoPicture m_pictureQueue[VIDEO_PICTURE_QUEUE_SIZE];
   int m_pictqSize = 0;
   int m_pictqRindex = 0;
   int m_pictqWindex = 0;
-  SDL_mutex* pictq_mutex = nullptr;
-  SDL_cond* pictq_cond = nullptr;
+  SDL_mutex* m_pictqMutex = nullptr;
+  SDL_cond* m_pictqCond = nullptr;
+
 
   // output audio device index in windows
   int m_outputAudioDeviceIndex = -1;
