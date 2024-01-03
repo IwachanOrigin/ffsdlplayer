@@ -4,7 +4,7 @@
 
 #include <string>
 #include <memory>
-#include <functional>
+#include <atomic>
 
 extern "C"
 {
@@ -20,13 +20,13 @@ extern "C"
 #include <SDL_thread.h>
 }
 
+#include "videorenderer.h"
+#include "videodecoder.h"
+
 namespace player
 {
 
 class VideoState;
-class VideoDecoder;
-class VideoRenderer;
-class AudioDecoder;
 
 class VideoReader
 {
@@ -36,13 +36,14 @@ public:
 
   int start(const std::string& filename, const int& audioDeviceIndex);
   void stop();
+  bool isFinished() const { return m_isFinished; }
 
 private:
   std::shared_ptr<VideoState> m_videoState = nullptr;
-  std::unique_ptr<VideoDecoder> m_videoDecoder = nullptr;
-  std::unique_ptr<VideoRenderer> m_videoRenderer = nullptr;
-  std::unique_ptr<AudioDecoder> m_audioDecoder = nullptr;
+  std::shared_ptr<VideoDecoder> m_videoDecoder = nullptr;
+  std::shared_ptr<VideoRenderer> m_videoRenderer = nullptr;
   std::string m_filename = "";
+  std::atomic_bool m_isFinished = false;
 
   int streamComponentOpen(std::shared_ptr<VideoState> vs, const int& streamIndex);
   int readThread(std::shared_ptr<VideoState> vs);

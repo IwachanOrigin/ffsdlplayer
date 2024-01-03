@@ -5,10 +5,8 @@
 #include "videostate.h"
 #include "videoreader.h"
 
-#include "videodecoder.h"
 #include "audiodecoder.h"
 #include "audioresamplingstate.h"
-#include "videorenderer.h"
 
 #define MAX_QUEUE_SIZE (15 * 1024 * 1024)
 
@@ -37,7 +35,23 @@ int VideoReader::start(const std::string& filename, const int& audioDeviceIndex)
 
 void VideoReader::stop()
 {
-  
+  if (m_videoRenderer)
+  {
+    m_videoRenderer->stop();
+  }
+
+  if (m_videoDecoder)
+  {
+    m_videoDecoder->stop();
+  }
+
+  if (m_videoState)
+  {
+    m_videoState->clearAudioPacketRead();
+    m_videoState->clearVideoPacketRead();
+  }
+
+  m_isFinished = true;
 }
 
 int VideoReader::readThread(std::shared_ptr<VideoState> vs)
@@ -138,6 +152,13 @@ int VideoReader::readThread(std::shared_ptr<VideoState> vs)
   // main decode loop. read in a packet and put it on the queue
   for (;;)
   {
+    {
+      if (!m_videoState->isPlayerFinished())
+      {
+        m_isFinished = true;
+        break;
+      }
+    }
     // seek stuff goes here
     auto seekReq = videoState->seekRequest();
     if (seekReq)
@@ -325,9 +346,6 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
   {
     case AVMEDIA_TYPE_AUDIO:
     {
-      // start audio thread
-      m_audioDecoder = std::make_unique<AudioDecoder>();
-
       SDL_AudioSpec wants{};
       SDL_AudioSpec spec{};
 
@@ -336,7 +354,7 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
       wants.channels = codecCtx->ch_layout.nb_channels;
       wants.silence = 0;
       wants.samples = SDL_AUDIO_BUFFER_SIZE;
-      wants.callback = m_audioDecoder->audioCallbackWrapper;
+      wants.callback = audioCallback;
       wants.userdata = vs.get();
 
       // open audio device

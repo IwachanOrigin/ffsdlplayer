@@ -17,6 +17,11 @@
 
 using namespace player;
 
+VideoRenderer::~VideoRenderer()
+{
+  this->stop();
+}
+
 int VideoRenderer::start(std::shared_ptr<VideoState> vs)
 {
   m_vs = vs;

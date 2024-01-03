@@ -11,7 +11,7 @@ class VideoRenderer
 {
 public:
   explicit VideoRenderer() = default;
-  ~VideoRenderer() = default;
+  ~VideoRenderer();
 
   int start(std::shared_ptr<VideoState> vs);
   void stop();

@@ -29,8 +29,6 @@ extern "C"
 namespace player
 {
 
-class AudioDecoder;
-
 enum class SYNC_TYPE
 {
   // sync to audio clock
@@ -69,8 +67,6 @@ public:
   SDL_mutex*& pictureQueueMutex() { return m_pictqMutex; }
   SDL_cond*& pictureQueueCond() { return m_pictqCond; }
   SYNC_TYPE syncType() const { return m_avSyncType; }
-  void setAudioDecoder(std::shared_ptr<AudioDecoder> audioDecoder);
-  std::shared_ptr<AudioDecoder> audioDecoder();
   int queuePicture(AVFrame* pFrame, const double& pts);
 
   // For Read(Audio/Video)
@@ -151,7 +147,6 @@ private:
   double m_audioDiffAvgCoef = 0.0;
   double m_audioDiffThreshold = 0.0;
   int m_audioDiffAvgCount = 0;
-  std::shared_ptr<AudioDecoder> m_audioDecoder = nullptr;
 
   // video
   int m_videoStreamIndex = -1;

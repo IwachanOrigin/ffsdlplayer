@@ -98,12 +98,11 @@ int main(int argc, char *argv[])
   {
     std::chrono::milliseconds duration(1000);
     std::this_thread::sleep_for(duration);
-#if 0
-    if (videoReader->quitStatus())
+    if (videoReader->isFinished())
     {
+      videoReader->stop();
       break;
     }
-#endif
   }
 
   std::wcout << "finished." << std::endl;
