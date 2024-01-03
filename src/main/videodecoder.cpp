@@ -76,14 +76,22 @@ int VideoDecoder::decodeThread(std::shared_ptr<VideoState> vs)
     int ret = videoState->popVideoPacketRead(packet);
     if (ret < 0)
     {
-      // means we quit getting packets
-      break;
+      if (videoState->isPlayerFinished())
+      {
+        // means we quit getting packets
+        break;
+      }
+      continue;
     }
 
-    if (packet->data == videoState->flushPacket()->data)
+    auto flushPacket = videoState->flushPacket();
+    if (flushPacket)
     {
-      avcodec_flush_buffers(videoCodecCtx);
-      continue;
+      if (packet->data == flushPacket->data)
+      {
+        avcodec_flush_buffers(videoCodecCtx);
+        continue;
+      }
     }
 
     // init set pts to 0 for all frames

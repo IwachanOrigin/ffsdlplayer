@@ -22,12 +22,15 @@ void player::audioCallback(void* userdata, Uint8* stream, int len)
 
   double pts = 0;
   uint8_t* audioBuf = nullptr;
+  auto audioArrayBufSize = videoState->audioArrayBufSize();
   unsigned int audioBufIndex = 0;
 
   while (len > 0)
   {
-    if (!videoState->isPlayerFinished())
+    if (videoState->isPlayerFinished())
     {
+      auto sdlAudioDeviceID = videoState->sdlAudioDeviceID();
+      SDL_PauseAudioDevice(sdlAudioDeviceID, 1);
       return;
     }
 
@@ -36,13 +39,14 @@ void player::audioCallback(void* userdata, Uint8* stream, int len)
     if (audioBufIndex >= audioBufSize)
     {
       // we have already sent all avaialble data; get more
-      audioBuf = videoState->audioBuf();
-      audioSize = player::audioDecodeFrame(videoState, audioBuf, sizeof(audioBuf), pts);
+      audioBuf = videoState->audioArrayBuf(); 
+      audioSize = player::audioDecodeFrame(videoState, audioBuf, audioArrayBufSize, pts);
 
       if (audioSize < 0)
       {
         // output silence
-        videoState->setAudioBufSize(1024);
+        audioBufSize = 1024;
+        videoState->setAudioBufSize(audioBufSize);
 
         // clear memory
         std::memset(audioBuf, 0, audioBufSize);
@@ -50,9 +54,11 @@ void player::audioCallback(void* userdata, Uint8* stream, int len)
       else
       {
         audioSize = player::syncAudio(videoState, (int16_t *)audioBuf, audioSize);
-        videoState->setAudioBufSize(audioSize);
+        audioBufSize = audioSize;
+        videoState->setAudioBufSize(audioBufSize);
       }
-      videoState->setAudioBufIndex(0);
+      audioBufIndex = 0;
+      videoState->setAudioBufIndex(audioBufIndex);
     }
 
     len1 = audioBufSize - audioBufIndex;
@@ -188,10 +194,13 @@ int player::audioDecodeFrame(VideoState* vs, uint8_t* audio_buf, int bufSize, do
     }
 
     auto& flushPacket = vs->flushPacket();
-    if (avPacket->data == flushPacket->data)
+    if (flushPacket)
     {
-      avcodec_flush_buffers(audioCodecCtx);
-      continue;
+      if (avPacket->data == flushPacket->data)
+      {
+        avcodec_flush_buffers(audioCodecCtx);
+        continue;
+      }
     }
 
     audioPktData = avPacket->data;

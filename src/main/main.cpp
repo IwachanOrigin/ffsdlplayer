@@ -105,6 +105,11 @@ int main(int argc, char *argv[])
     }
   }
 
+  //
+  SDL_VideoQuit();
+  SDL_AudioQuit();
+  SDL_Quit();
+
   std::wcout << "finished." << std::endl;
   return 0;
 }

@@ -50,6 +50,11 @@ int VideoRenderer::displayThread()
 
   for (;;)
   {
+    if (m_vs->isPlayerFinished())
+    {
+      break;
+    }
+
     double incr = 0, pos = 0;
     // wait indefinitely for the next available event
     ret = SDL_WaitEvent(&event);
@@ -173,7 +178,7 @@ void VideoRenderer::videoRefreshTimer()
   if (videoStream)
   {
     // check the videopicture queue contains decoded frames
-    auto& pictureQueueSize = m_vs->videoPictureQueueSize();
+    auto pictureQueueSize = m_vs->videoPictureQueueSize();
     if (pictureQueueSize == 0)
     {
       this->scheduleRefresh(1);

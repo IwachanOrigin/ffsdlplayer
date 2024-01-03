@@ -1,6 +1,7 @@
 
 #include <cstring>
 #include <thread>
+#include <utility>
 
 #include "videostate.h"
 #include "videoreader.h"
@@ -62,7 +63,7 @@ int VideoReader::readThread(std::shared_ptr<VideoState> vs)
   auto videoState = vs;
 
   // Set the AVFormatContext for the global videostate ref
-  auto formatCtx = videoState->formatCtx();
+  auto& formatCtx = videoState->formatCtx();
   AVDictionary* options = nullptr;
   av_dict_set(&options, "rtsp_transport", "tcp", 0);
   ret = avformat_open_input(&formatCtx, m_filename.c_str(), nullptr, &options);
@@ -153,7 +154,7 @@ int VideoReader::readThread(std::shared_ptr<VideoState> vs)
   for (;;)
   {
     {
-      if (!m_videoState->isPlayerFinished())
+      if (m_videoState->isPlayerFinished())
       {
         m_isFinished = true;
         break;
@@ -276,7 +277,7 @@ int VideoReader::readThread(std::shared_ptr<VideoState> vs)
 int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& streamIndex)
 {
   // retrieve file I/O context
-  auto formatCtx = vs->formatCtx();
+  auto& formatCtx = vs->formatCtx();
 
   // check the given stream index in valid
   if (streamIndex < 0 || streamIndex >= formatCtx->nb_streams)
@@ -309,32 +310,6 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
     return -1;
   }
 
-#if 0
-  if (codecCtx->codec_type == AVMEDIA_TYPE_AUDIO)
-  {
-    SDL_AudioSpec wants{};
-    SDL_AudioSpec spec{};
-
-    wants.freq = codecCtx->sample_rate;
-    wants.format = AUDIO_S16SYS;
-    wants.channels = codecCtx->ch_layout.nb_channels;
-    wants.silence = 0;
-    wants.samples = SDL_AUDIO_BUFFER_SIZE;
-    wants.callback = audio_callback;
-    wants.userdata = vs.get();
-
-    // open audio device
-    auto outputAudioDeviceIndex = vs->outputAudioDeviceIndex();
-    auto sdlAudioDeviceID = vs->sdlAudioDeviceID();
-    sdlAudioDeviceID = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(outputAudioDeviceIndex, 0), false, &wants, &spec, 0);
-    if (sdlAudioDeviceID <= 0)
-    {
-      ret = -1;
-      return -1;
-    }
-    vs->setSdlAudioDeviceID(sdlAudioDeviceID);
-  }
-#endif
   // init the AVCodecContext to use the given AVCodec
   if (avcodec_open2(codecCtx, codec, nullptr) < 0)
   {
@@ -346,12 +321,16 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
   {
     case AVMEDIA_TYPE_AUDIO:
     {
+      auto& audioCodecCtx = vs->audioCodecCtx();
+      audioCodecCtx = std::move(codecCtx);
+      auto& audioStream = vs->audioStream();
+      audioStream = formatCtx->streams[streamIndex];
+
       SDL_AudioSpec wants{};
       SDL_AudioSpec spec{};
-
-      wants.freq = codecCtx->sample_rate;
+      wants.freq = audioCodecCtx->sample_rate;
       wants.format = AUDIO_S16SYS;
-      wants.channels = codecCtx->ch_layout.nb_channels;
+      wants.channels = audioCodecCtx->ch_layout.nb_channels;
       wants.silence = 0;
       wants.samples = SDL_AUDIO_BUFFER_SIZE;
       wants.callback = audioCallback;
@@ -381,13 +360,17 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
       vs->setFrameDecodeLastDelay(40e-3);
       vs->setVideoDecodeCurrentPtsTime(av_gettime());
 
+      auto& videoCodecCtx = vs->videoCodecCtx();
+      videoCodecCtx = std::move(codecCtx);
+      auto& videoStream = vs->videoStream();
+      videoStream = formatCtx->streams[streamIndex];
+
       // start video thread
       m_videoDecoder = std::make_unique<VideoDecoder>();
       m_videoDecoder->start(vs);
 
       // set up the videostate swscontext to convert the image data to yuv420
       auto& decodeVideoSwsCtx = vs->decodeVideoSwsCtx();
-      auto& videoCodecCtx = vs->videoCodecCtx();
       decodeVideoSwsCtx = sws_getContext(
         videoCodecCtx->width
         , videoCodecCtx->height

@@ -40,8 +40,8 @@ public:
 
 private:
   std::shared_ptr<VideoState> m_videoState = nullptr;
-  std::shared_ptr<VideoDecoder> m_videoDecoder = nullptr;
-  std::shared_ptr<VideoRenderer> m_videoRenderer = nullptr;
+  std::unique_ptr<VideoDecoder> m_videoDecoder = nullptr;
+  std::unique_ptr<VideoRenderer> m_videoRenderer = nullptr;
   std::string m_filename = "";
   std::atomic_bool m_isFinished = false;
 

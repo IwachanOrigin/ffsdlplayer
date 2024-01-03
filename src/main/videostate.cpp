@@ -89,14 +89,14 @@ void VideoState::allocPicture()
   m_flushPkt = av_packet_alloc();
   m_flushPkt->data = (uint8_t*)"FLUSH";
 
-  auto videoPicture = m_pictureQueue[m_pictqWindex];
+  auto videoPicture = &m_pictureQueue[m_pictqWindex];
 
   // check if the sdl_overlay is allocated
-  if (videoPicture.frame)
+  if (videoPicture->frame)
   {
     // we already have an avframe allocated, free memory
-    av_frame_free(&videoPicture.frame);
-    av_free(videoPicture.frame);
+    av_frame_free(&videoPicture->frame);
+    av_free(videoPicture->frame);
   }
 
   // lock global screen mutex
@@ -115,16 +115,16 @@ void VideoState::allocPicture()
   auto buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
 
   // alloc the avframe later used to contain the scaled frame
-  videoPicture.frame = av_frame_alloc();
-  if (videoPicture.frame == nullptr)
+  videoPicture->frame = av_frame_alloc();
+  if (videoPicture->frame == nullptr)
   {
     return;
   }
 
   // the fields of the given image are filled in by using the buffer which points to the image data buffer
   av_image_fill_arrays(
-    videoPicture.frame->data
-    , videoPicture.frame->linesize
+    videoPicture->frame->data
+    , videoPicture->frame->linesize
     , buffer
     , AV_PIX_FMT_YUV420P
     , m_videoCtx->width
@@ -136,9 +136,9 @@ void VideoState::allocPicture()
   SDL_UnlockMutex(m_screenMutex);
 
   // update videoPicture struct fields
-  videoPicture.width = m_videoCtx->width;
-  videoPicture.height = m_videoCtx->height;
-  videoPicture.allocated = 1;
+  videoPicture->width = m_videoCtx->width;
+  videoPicture->height = m_videoCtx->height;
+  videoPicture->allocated = 1;
 }
 
 int VideoState::queuePicture(AVFrame* pFrame, const double& pts)

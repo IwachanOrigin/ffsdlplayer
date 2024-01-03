@@ -113,7 +113,8 @@ public:
   void setAudioDiffThreshold(const double& diffThreshold) { m_audioDiffThreshold = diffThreshold; }
   double audioDiffAvgCount() const { return m_audioDiffAvgCount; }
   void setAudioDiffAvgCount(const double& diffAvgCount) { m_audioDiffAvgCount = diffAvgCount; }
-  uint8_t* audioBuf() { return m_audioBuf; }
+  uint8_t* audioArrayBuf() { return m_audioBuf; }
+  int audioArrayBufSize() const { return (MAX_AUDIO_FRAME_SIZE * 3) / 2; }
 
   // For calculate clock.
   double masterClock();
