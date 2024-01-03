@@ -1,6 +1,7 @@
 
 #include <iostream>
 #include "videostate.h"
+#include "audiodecoder.h"
 
 using namespace player;
 
@@ -309,3 +310,6 @@ void VideoState::streamSeek(const int64_t& pos, const int& rel)
     m_seekReq = 1;
   }
 }
+
+void VideoState::setAudioDecoder(std::shared_ptr<AudioDecoder> audioDecoder) { m_audioDecoder = audioDecoder; }
+std::shared_ptr<AudioDecoder> VideoState::audioDecoder() { return m_audioDecoder; }

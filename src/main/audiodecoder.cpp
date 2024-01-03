@@ -18,35 +18,39 @@ void AudioDecoder::audioCallback(void* userdata, Uint8* stream, int len)
   VideoState* videoState = (VideoState *) userdata;
 
   int len1 = -1;
-  int audio_size = -1;
+  int audioSize = -1;
 
   double pts = 0;
+  uint8_t* audioBuf = nullptr;
+  unsigned int audioBufIndex = 0;
 
   while (len > 0)
   {
-    if (videoState->audio_buf_index >= videoState->audio_buf_size)
+    audioBufIndex = videoState->audioBufIndex();
+    auto audioBufSize = videoState->audioBufSize();
+    if (audioBufIndex >= audioBufSize)
     {
       // we have already sent all avaialble data; get more
-      audio_size = audioDecodeFrame(videoState, videoState->audio_buf, sizeof(videoState->audio_buf), pts);
+      audioBuf = videoState->audioBuf();
+      audioSize = this->audioDecodeFrame(videoState, audioBuf, sizeof(audioBuf), pts);
 
-      if (audio_size < 0)
+      if (audioSize < 0)
       {
         // output silence
-        videoState->audio_buf_size = 1024;
+        videoState->setAudioBufSize(1024);
 
         // clear memory
-        std::memset(videoState->audio_buf, 0, videoState->audio_buf_size);
+        std::memset(audioBuf, 0, audioBufSize);
       }
       else
       {
-        audio_size = syncAudio(videoState, (int16_t *)videoState->audio_buf, audio_size);
-        videoState->audio_buf_size = audio_size;
+        audioSize = this->syncAudio(videoState, (int16_t *)audioBuf, audioSize);
+        videoState->setAudioBufSize(audioSize);
       }
-
-      videoState->audio_buf_index = 0;
+      videoState->setAudioBufIndex(0);
     }
 
-    len1 = videoState->audio_buf_size - videoState->audio_buf_index;
+    len1 = audioBufSize - audioBufIndex;
 
     if (len1 > len)
     {
@@ -54,19 +58,19 @@ void AudioDecoder::audioCallback(void* userdata, Uint8* stream, int len)
     }
 
     // copy data from audio buffer to the SDL stream
-    std::memcpy(stream, (uint8_t *)videoState->audio_buf + videoState->audio_buf_index, len1);
+    std::memcpy(stream, (uint8_t *)audioBuf + audioBufIndex, len1);
 
     len -= len1;
     stream += len1;
-    videoState->audio_buf_index += len1;
+    videoState->setAudioBufIndex(audioBufIndex + len1);
   }
 }
 
-int AudioDecoder::audioDecodeFrame(VideoState* vs, uint8_t *audio_buf, int buf_size, double& pts_ptr)
+int AudioDecoder::audioDecodeFrame(VideoState* vs, uint8_t* audio_buf, int bufSize, double& pts_ptr)
 {
   AVPacket* avPacket = av_packet_alloc();
-  static uint8_t* audio_pkt_data = nullptr;
-  static int audio_pkt_size = 0;
+  static uint8_t* audioPktData = nullptr;
+  static int audioPktSize = 0;
 
   int n = 0;
 
@@ -78,13 +82,13 @@ int AudioDecoder::audioDecodeFrame(VideoState* vs, uint8_t *audio_buf, int buf_s
   }
 
   int len1 = 0;
-  int data_size = 0;
+  int dataSize = 0;
 
   auto& audioCodecCtx = vs->audioCodecCtx();
 
   for (;;)
   {
-    while (audio_pkt_size > 0)
+    while (audioPktSize > 0)
     {
       int got_frame = 0;
 
@@ -120,27 +124,27 @@ int AudioDecoder::audioDecodeFrame(VideoState* vs, uint8_t *audio_buf, int buf_s
       if (len1 < 0)
       {
         // if error, skip frame
-        audio_pkt_size = 0;
+        audioPktSize = 0;
         break;
       }
 
-      audio_pkt_data += len1;
-      audio_pkt_size -= len1;
-      data_size = 0;
+      audioPktData += len1;
+      audioPktSize -= len1;
+      dataSize = 0;
 
       if (got_frame)
       {
         // audio resampling
-        data_size = audioResampling(
+        dataSize = audioResampling(
           vs
           , avFrame
           , AVSampleFormat::AV_SAMPLE_FMT_S16
           , audio_buf);
 
-        assert(data_size <= buf_size);
+        assert(dataSize <= bufSize);
       }
 
-      if (data_size <= 0)
+      if (dataSize <= 0)
       {
         // no data yet, get more frames
         continue;
@@ -150,7 +154,7 @@ int AudioDecoder::audioDecodeFrame(VideoState* vs, uint8_t *audio_buf, int buf_s
       auto audioClock = vs->audioClock();
       pts_ptr = audioClock;
       n = 2 * audioCodecCtx->ch_layout.nb_channels;
-      audioClock += (double)data_size / (double)(n * audioCodecCtx->sample_rate);
+      audioClock += (double)dataSize / (double)(n * audioCodecCtx->sample_rate);
       vs->setAudioClock(audioClock);
 
       if (avPacket->data)
@@ -161,7 +165,7 @@ int AudioDecoder::audioDecodeFrame(VideoState* vs, uint8_t *audio_buf, int buf_s
       av_frame_free(&avFrame);
 
       // we have the data, return it and come back for more later
-      return data_size;
+      return dataSize;
     }
 
     if (avPacket->data)
@@ -185,8 +189,8 @@ int AudioDecoder::audioDecodeFrame(VideoState* vs, uint8_t *audio_buf, int buf_s
       continue;
     }
 
-    audio_pkt_data = avPacket->data;
-    audio_pkt_size = avPacket->size;
+    audioPktData = avPacket->data;
+    audioPktSize = avPacket->size;
 
     // keep audio_clock up to date
     if (avPacket->pts != AV_NOPTS_VALUE)
@@ -396,73 +400,76 @@ int AudioDecoder::audioResampling(
   return arState.resampled_data_size;
 }
 
-int AudioDecoder::syncAudio(VideoState* vs, short* samples, int& samples_size)
+int AudioDecoder::syncAudio(VideoState* vs, short* samples, int& samplesSize)
 {
-  int n = 0;
-  double ref_clock = 0;
   auto& audioCodecCtx = vs->audioCodecCtx();
-  n = 2 * audioCodecCtx->ch_layout.nb_channels;
+  int n = 2 * audioCodecCtx->ch_layout.nb_channels;
 
   // check
-  if (vs->av_sync_type != SYNC_TYPE::AV_SYNC_AUDIO_MASTER)
+  auto avSyncType = vs->syncType();
+  if (avSyncType != SYNC_TYPE::AV_SYNC_AUDIO_MASTER)
   {
-    double diff = 0;
-    double avg_diff = 0;
-    int wanted_size = 0;
-    int min_size = 0;
-    int max_size = 0;
-    ref_clock = vs->masterClock();
-    diff = vs->calcAudioClock() - ref_clock;
+    auto refClock = vs->masterClock();
+    auto audioClock = vs->calcAudioClock();
+    auto diff = audioClock - refClock;
 
     if (diff < AV_NOSYNC_THRESHOLD)
     {
       // accumulate the diffs
-      videoState->audio_diff_cum = diff + videoState->audio_diff_avg_coef * videoState->audio_diff_cum;
-      if (videoState->audio_diff_avg_count < AUDIO_DIFF_AVG_NB)
+      auto audioDiffAvgCoef = vs->audioDiffAvgCoef();
+      auto audioDiffCum = vs->audioDiffCum();
+      vs->setAudioDiffCum(diff + audioDiffAvgCoef * audioDiffCum);
+      auto audioDiffAvgCount = vs->audioDiffAvgCount();
+      if (audioDiffAvgCount < AUDIO_DIFF_AVG_NB)
       {
-        videoState->audio_diff_avg_count++;
+        audioDiffAvgCount++;
+        vs->setAudioDiffAvgCount(audioDiffAvgCount);
       }
       else
       {
-        avg_diff = videoState->audio_diff_cum * (1.0 - videoState->audio_diff_avg_coef);
-        if (fabs(avg_diff) >= videoState->audio_diff_threshold)
+        auto audioDiffCum = vs->audioDiffCum();
+        auto audioDiffAvgCoef = vs->audioDiffAvgCoef();
+        auto avgDiff = audioDiffCum * (1.0 - audioDiffAvgCoef);
+        auto audioDiffThreshold = vs->audioDiffThreshold();
+        if (fabs(avgDiff) >= audioDiffThreshold)
         {
-          wanted_size = samples_size + ((int)(diff * videoState->audio_ctx->sample_rate) * n);
-          min_size = samples_size * ((100 - SAMPLE_CORRECTION_PERCENT_MAX) / 100);
-          max_size = samples_size * ((100 + SAMPLE_CORRECTION_PERCENT_MAX) / 100);
+          auto sampleRate = audioCodecCtx->sample_rate;
+          auto wantedSize = samplesSize + ((int)(diff * sampleRate) * n);
+          auto minSize = samplesSize * ((100 - SAMPLE_CORRECTION_PERCENT_MAX) / 100);
+          auto maxSize = samplesSize * ((100 + SAMPLE_CORRECTION_PERCENT_MAX) / 100);
 
-          if (wanted_size < min_size)
+          if (wantedSize < minSize)
           {
-            wanted_size = min_size;
+            wantedSize = minSize;
           }
-          else if (wanted_size > max_size)
+          else if (wantedSize > maxSize)
           {
-            wanted_size = max_size;
+            wantedSize = maxSize;
           }
 
-          if (wanted_size < samples_size)
+          if (wantedSize < samplesSize)
           {
             // remove samples
-            samples_size = wanted_size;
+            samplesSize = wantedSize;
           }
-          else if (wanted_size > samples_size)
+          else if (wantedSize > samplesSize)
           {
-            uint8_t *samples_end = nullptr, *q = nullptr;
-            int nb = 0;
+            uint8_t* samplesEnd = nullptr;
+            uint8_t* dst = nullptr;
 
             // add samples by copying final sample
-            nb = (samples_size - wanted_size);
-            samples_end = (uint8_t *)samples + samples_size - n;
-            q = samples_end + n;
+            auto nb = (samplesSize - wantedSize);
+            samplesEnd = (uint8_t *)samples + samplesSize - n;
+            dst = samplesEnd + n;
 
             while (nb > 0)
             {
-              std::memcpy(q, samples_end, n);
-              q += n;
+              std::memcpy(dst, samplesEnd, n);
+              dst += n;
               nb -= n;
             }
 
-            samples_size = wanted_size;
+            samplesSize = wantedSize;
           }
         }
       }
@@ -470,12 +477,12 @@ int AudioDecoder::syncAudio(VideoState* vs, short* samples, int& samples_size)
     else
     {
       // difference is TOO big, reset diff stuff
-      videoState->audio_diff_avg_count = 0;
-      videoState->audio_diff_cum = 0;
+      vs->setAudioDiffAvgCount(0);
+      vs->setAudioDiffCum(0);
     }
   }
 
-  return samples_size;
+  return samplesSize;
 }
 
 void AudioDecoder::releasePointer(AudioReSamplingState& arState)

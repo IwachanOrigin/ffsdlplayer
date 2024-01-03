@@ -4,6 +4,7 @@
 
 #include <string>
 #include <atomic>
+#include <memory>
 #include "packetqueue.h"
 #include "videopicture.h"
 
@@ -27,6 +28,8 @@ extern "C"
 
 namespace player
 {
+
+class AudioDecoder;
 
 enum class SYNC_TYPE
 {
@@ -65,9 +68,12 @@ public:
   VideoPicture& videoPicture() { return m_pictureQueue[m_pictqRindex]; }
   SDL_mutex*& pictureQueueMutex() { return m_pictqMutex; }
   SDL_cond*& pictureQueueCond() { return m_pictqCond; }
+  SYNC_TYPE syncType() const { return m_avSyncType; }
+  void setAudioDecoder(std::shared_ptr<AudioDecoder> audioDecoder);
+  std::shared_ptr<AudioDecoder> audioDecoder();
   int queuePicture(AVFrame* pFrame, const double& pts);
 
-  // For Read
+  // For Read(Audio/Video)
   int pushAudioPacketRead(AVPacket* packet);
   int pushVideoPacketRead(AVPacket* packet);
   int popAudioPacketRead(AVPacket* packet);
@@ -79,7 +85,8 @@ public:
   void clearAudioPacketRead() { m_audioPacketQueue.clear(); }
   void clearVideoPacketRead() { m_videoPacketQueue.clear(); }
 
-  // For Decode
+
+  // For Video Decode
   struct SwsContext*& decodeVideoSwsCtx() { return m_decodeVideoSwsCtx; }
   SDL_mutex*& screenMutex() { return m_screenMutex; }
   double frameDecodeTimer() const { return m_frameDecodeTimer; }
@@ -90,16 +97,27 @@ public:
   void setFrameDecodeLastDelay(const double& frameLastDelay) { m_frameDecodeLastDelay = frameLastDelay; }
   double videoClock() const { return m_videoClock; }
   void setVideoClock(const double& videoClock) { m_videoClock = videoClock; }
-  double audioClock() const { return m_audioClock; }
-  void setAudioClock(const double& audioClock) { m_audioClock = audioClock; }
   double videoDecodeCurrentPts() const { return m_videoDecodeCurrentPts; }
   void setVideoDecodeCurrentPts(const double& videoCurrentPts) { m_videoDecodeCurrentPts = videoCurrentPts; }
   int64_t videoDecodeCurrentPtsTime() const { return m_videoDecodeCurrentPtsTime; }
   void setVideoDecodeCurrentPtsTime(const int64_t& videoCurrentPtsTime) { m_videoDecodeCurrentPtsTime = videoCurrentPtsTime; }
+
+  // For Audio Decode  
+  double audioClock() const { return m_audioClock; }
+  void setAudioClock(const double& audioClock) { m_audioClock = audioClock; }
   unsigned int audioBufSize() const { return m_audioBufSize; }
   void setAudioBufSize(const unsigned int& audioBufSize) { m_audioBufSize = audioBufSize; }
   unsigned int audioBufIndex() const { return m_audioBufIndex; }
   void setAudioBufIndex(const unsigned int& audioBufIndex) { m_audioBufIndex = audioBufIndex; }
+  double audioDiffCum() const { return m_audioDiffCum; }
+  void setAudioDiffCum(const double& diffCum) { m_audioDiffCum = diffCum; }
+  double audioDiffAvgCoef() const { return m_audioDiffAvgCoef; }
+  void setAudioDiffAvgCoef(const double& diffAvgCoef) { m_audioDiffAvgCoef = diffAvgCoef; }
+  double audioDiffThreshold() const { return m_audioDiffThreshold; }
+  void setAudioDiffThreshold(const double& diffThreshold) { m_audioDiffThreshold = diffThreshold; }
+  double audioDiffAvgCount() const { return m_audioDiffAvgCount; }
+  void setAudioDiffAvgCount(const double& diffAvgCount) { m_audioDiffAvgCount = diffAvgCount; }
+  uint8_t* audioBuf() { return m_audioBuf; }
 
   // For calculate clock.
   double masterClock();
@@ -127,11 +145,13 @@ private:
   uint8_t m_audioBuf[(MAX_AUDIO_FRAME_SIZE * 3) /2];
   unsigned int m_audioBufSize = 0;
   unsigned int m_audioBufIndex = 0;
-  AVFrame m_audioFrame;
-  AVPacket m_audioPkt;
-  uint8_t* m_audioPktData;
   int m_audioPktSize = 0;
   double m_audioClock = 0.0;
+  double m_audioDiffCum = 0.0;
+  double m_audioDiffAvgCoef = 0.0;
+  double m_audioDiffThreshold = 0.0;
+  int m_audioDiffAvgCount = 0;
+  std::shared_ptr<AudioDecoder> m_audioDecoder = nullptr;
 
   // video
   int m_videoStreamIndex = -1;
@@ -145,10 +165,6 @@ private:
   double m_videoClock = 0.0;
   double m_videoDecodeCurrentPts = 0.0;
   int64_t m_videoDecodeCurrentPtsTime = 0;
-  double m_audioDiffCum = 0.0;
-  double m_audioDiffAvgCoef = 0.0;
-  double m_audioDiffThreshold = 0.0;
-  int m_audioDiffAvgCount = 0;
   // SDL_surface mutex
   SDL_mutex* m_screenMutex = nullptr;
 

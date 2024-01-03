@@ -30,11 +30,21 @@ public:
   ~AudioDecoder() = default;
 
   void audioCallback(void* userdata, Uint8* stream, int len);
+  static void audioCallbackWrapper(void* userdata, Uint8* stream, int len)
+  {
+    // retrieve the videostate
+    VideoState* videoState = (VideoState*)userdata;
+    auto audioDecoder = videoState->audioDecoder();
+    if (audioDecoder)
+    {
+      audioDecoder->audioCallback(userdata, stream, len);
+    }
+  }
 
 private:
-  int audioDecodeFrame(VideoState* vs, uint8_t* audio_buf, int buf_size, double& pts_ptr);
+  int audioDecodeFrame(VideoState* vs, uint8_t* audio_buf, int buf_size, double& ptsPtr);
   int audioResampling(VideoState* vs, AVFrame* decodedAudioFrame, AVSampleFormat outSampleFmt, uint8_t* outBuf);
-  int syncAudio(VideoState* vs, short* samples, int& samples_size);
+  int syncAudio(VideoState* vs, short* samples, int& samplesSize);
   void releasePointer(AudioReSamplingState& arState);
 };
 

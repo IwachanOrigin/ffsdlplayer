@@ -4,6 +4,7 @@
 
 #include <string>
 #include <memory>
+#include <functional>
 
 extern "C"
 {
@@ -25,6 +26,7 @@ namespace player
 class VideoState;
 class VideoDecoder;
 class VideoRenderer;
+class AudioDecoder;
 
 class VideoReader
 {
@@ -36,9 +38,10 @@ public:
   void stop();
 
 private:
-  std::shared_ptr<VideoState> m_videoState;
-  std::unique_ptr<VideoDecoder> m_videoDecoder;
-  std::unique_ptr<VideoRenderer> m_videoRenderer;
+  std::shared_ptr<VideoState> m_videoState = nullptr;
+  std::unique_ptr<VideoDecoder> m_videoDecoder = nullptr;
+  std::unique_ptr<VideoRenderer> m_videoRenderer = nullptr;
+  std::unique_ptr<AudioDecoder> m_audioDecoder = nullptr;
   std::string m_filename = "";
 
   int streamComponentOpen(std::shared_ptr<VideoState> vs, const int& streamIndex);

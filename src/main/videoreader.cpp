@@ -288,6 +288,7 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
     return -1;
   }
 
+#if 0
   if (codecCtx->codec_type == AVMEDIA_TYPE_AUDIO)
   {
     SDL_AudioSpec wants{};
@@ -312,6 +313,7 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
     }
     vs->setSdlAudioDeviceID(sdlAudioDeviceID);
   }
+#endif
   // init the AVCodecContext to use the given AVCodec
   if (avcodec_open2(codecCtx, codec, nullptr) < 0)
   {
@@ -323,11 +325,32 @@ int VideoReader::streamComponentOpen(std::shared_ptr<VideoState> vs, const int& 
   {
     case AVMEDIA_TYPE_AUDIO:
     {
-      // zero out the block of memory pointed
-      std::memset(&vs->audio_pkt, 0, sizeof(vs->audio_pkt));
+      // start audio thread
+      m_audioDecoder = std::make_unique<AudioDecoder>();
+
+      SDL_AudioSpec wants{};
+      SDL_AudioSpec spec{};
+
+      wants.freq = codecCtx->sample_rate;
+      wants.format = AUDIO_S16SYS;
+      wants.channels = codecCtx->ch_layout.nb_channels;
+      wants.silence = 0;
+      wants.samples = SDL_AUDIO_BUFFER_SIZE;
+      wants.callback = m_audioDecoder->audioCallbackWrapper;
+      wants.userdata = vs.get();
+
+      // open audio device
+      auto outputAudioDeviceIndex = vs->outputAudioDeviceIndex();
+      auto sdlAudioDeviceID = vs->sdlAudioDeviceID();
+      sdlAudioDeviceID = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(outputAudioDeviceIndex, 0), false, &wants, &spec, 0);
+      if (sdlAudioDeviceID <= 0)
+      {
+        ret = -1;
+        return -1;
+      }
+      vs->setSdlAudioDeviceID(sdlAudioDeviceID);
 
       // start playing audio device
-      auto sdlAudioDeviceID = vs->sdlAudioDeviceID();
       SDL_PauseAudioDevice(sdlAudioDeviceID, 0);
     }
     break;
