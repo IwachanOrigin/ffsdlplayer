@@ -36,7 +36,7 @@ NOTE2: ビルドにはversion 6.0を利用しています。version 6.1以上の
 
 #### FFMPEG
 
-NOTE1: https://ubuntuhandbook.org/index.php/2023/03/ffmpeg-6-0-released-how-to-install-in-ubuntu-22-04-20-04/  
+NOTE1: [Ubuntu22.04へFFMPEG6をインストール](https://ubuntuhandbook.org/index.php/2023/03/ffmpeg-6-0-released-how-to-install-in-ubuntu-22-04-20-04/)  
 NOTE2: Savoury1 のPPAは依存関係の問題を解決できず、インストールに失敗します。  
 
 FFMPEGは6.0以降をインストールする必要があります。  
