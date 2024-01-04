@@ -7,7 +7,7 @@
 
 ## Dependency
 
-    - SDL2 2.26.5  
+    - SDL2 2.28.1  
     - FFMPEG 6.0+  
 
 ## Setup
