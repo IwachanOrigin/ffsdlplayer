@@ -14,6 +14,18 @@
 
 ### For Windows
 
+#### SDL2
+
+SDL2は公式サイトよりダウンロードし、任意のディレクトリへ配置してください。  
+[SDL Homepage](https://www.libsdl.org/)  
+
+#### FFMPEG
+
+FFMPEGは公式サイトよりダウンロードし、任意のディレクトリへ配置してください。  
+[FFMPEG Download](https://ffmpeg.org/download.html)  
+
+NOTE1: LGPLバージョンをダウンロードしてください。  
+NOTE2: ビルドにはversion 6.0を利用しています。version 6.1以上の場合、DLL名など変更する必要があります。  
 
 ### For Ubuntu
 
@@ -94,6 +106,8 @@ apt policy libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libavdev
 
 
 ## Build
+
+FFMPEGはversion 6.0を利用しています。version 6.1以上の場合、DLL名など変更する必要があります。  
 
 ### For Windows
 
