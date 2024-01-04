@@ -7,13 +7,25 @@
 
 ## Dependency
 
-    - SDL2 2.26.5  
+    - SDL2 2.28.1  
     - FFMPEG 6.0+  
 
 ## Setup
 
 ### For Windows
 
+#### SDL2
+
+SDL2は公式サイトよりダウンロードし、任意のディレクトリへ配置してください。  
+[SDL Homepage](https://www.libsdl.org/)  
+
+#### FFMPEG
+
+FFMPEGは公式サイトよりダウンロードし、任意のディレクトリへ配置してください。  
+[FFMPEG Download](https://ffmpeg.org/download.html)  
+
+NOTE1: LGPLバージョンをダウンロードしてください。  
+NOTE2: ビルドにはversion 6.0を利用しています。version 6.1以上の場合、DLL名など変更する必要があります。  
 
 ### For Ubuntu
 
@@ -24,7 +36,7 @@
 
 #### FFMPEG
 
-NOTE1: https://ubuntuhandbook.org/index.php/2023/03/ffmpeg-6-0-released-how-to-install-in-ubuntu-22-04-20-04/  
+NOTE1: [Ubuntu22.04へFFMPEG6をインストール](https://ubuntuhandbook.org/index.php/2023/03/ffmpeg-6-0-released-how-to-install-in-ubuntu-22-04-20-04/)  
 NOTE2: Savoury1 のPPAは依存関係の問題を解決できず、インストールに失敗します。  
 
 FFMPEGは6.0以降をインストールする必要があります。  
@@ -32,23 +44,32 @@ FFMPEGは6.0以降をインストールする必要があります。
 
 1. ffmpeg6.0のPPAを追加します。  
 
-    sudo add-apt-repository ppa:ubuntuhandbook1/ffmpeg6
+``` shell
+sudo add-apt-repository ppa:ubuntuhandbook1/ffmpeg6
+```
 
 2. update を行います。  
 
-    sudo apt update  
+``` shell
+sudo apt update  
+```
 
 3. ffmpeg 6.0をインストールします  
 
-    sudo apt install ffmpeg
+``` shell
+sudo apt install ffmpeg
+```
 
 4. インストール可能なlibav...を確認します。  
 
-    apt policy libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libswresample-dev  
+``` shell
+apt policy libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libswresample-dev  
+```
 
 以下のような出力が得られると思います。  
 [Installed:]はインストール済みのものです。  
 
+``` text
 -------------------------------------------------------------------------------------------------------------
 libavcodec-dev:
   Installed: 7:6.0-1build8~22.04
@@ -67,27 +88,39 @@ libavcodec-dev:
      7:4.4.1-3ubuntu5 500
         500 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages
 -------------------------------------------------------------------------------------------------------------
+```
+
 
 5. 必要なバージョンをインストールします。  
-指定は3つだけですが、他のlibav...は依存しているので勝手にインストールされます。  
+   指定は3つだけですが、他のlibav...は依存しているので勝手にインストールされます。  
 
-    sudo apt install libavformat-dev=7:6.0-1build8~22.04 libavfilter-dev=7:6.0-1build8~22.04 libavdevice-dev=7:6.0-1build8~22.04  
+``` shell
+sudo apt install libavformat-dev=7:6.0-1build8~22.04 libavfilter-dev=7:6.0-1build8~22.04 libavdevice-dev=7:6.0-1build8~22.04  
+```
 
 6. 全てインストールされたかを確認します。  
 
-    apt policy libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libswresample-dev  
+``` shell
+apt policy libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libavdevice-dev libswscale-dev libswresample-dev  
+```
+
 
 ## Build
+
+FFMPEGはversion 6.0を利用しています。version 6.1以上の場合、DLL名など変更する必要があります。  
 
 ### For Windows
 
 #### Debug
 
 - Ninja + LLVM 16.0  
-powershell.exe cmake -S . -B build -G "\"Ninja Multi-Config"\" -D FFMPEG_PATH="/path/to/ffmpeg" -D SDL2_PATH="/path/to/sdl2"  
 
-    powershell.exe cmake -S . -B build -G "\"Ninja Multi-Config"\" -D FFMPEG_PATH="C:\software\ffmpeg-n6.0-latest-win64-lgpl-shared-6.0" -D SDL2_PATH="C:\software\sdl2\SDL2-devel-2.26.5-vc"  
-    powershell.exe cmake --build build  
+    powershell.exe cmake -S . -B build -G "\"Ninja Multi-Config"\" -D FFMPEG_PATH="/path/to/ffmpeg" -D SDL2_PATH="/path/to/sdl2"  
+
+``` shell
+powershell.exe cmake -S . -B build -G "\"Ninja Multi-Config\"" -D FFMPEG_PATH="C:\software\ffmpeg-n6.0-latest-win64-lgpl-shared-6.0" -D SDL2_PATH="C:\software\SDL2-2.28.1"  
+powershell.exe cmake --build build  
+```
 
 ### For Ubuntu(22.04 LTS)
 
@@ -95,6 +128,9 @@ powershell.exe cmake -S . -B build -G "\"Ninja Multi-Config"\" -D FFMPEG_PATH="/
 
 - GCC 11.4.0(Ubuntu 11.4.0-1ubuntu1~22.04)
 
-    cmake -S . -B build  
-    cmake --build build  
+``` shell
+cmake -S . -B build  
+cmake --build build  
+```
+
 

@@ -4,11 +4,7 @@
 
 #include <string>
 #include <memory>
-#include "videostate.h"
-#include "videodecoder.h"
-#include "audiodecoder.h"
-#include "audioresamplingstate.h"
-#include "videorenderer.h"
+#include <atomic>
 
 extern "C"
 {
@@ -24,24 +20,35 @@ extern "C"
 #include <SDL_thread.h>
 }
 
-static int deviceID = 0;
+#include "videorenderer.h"
+#include "videodecoder.h"
+
+namespace player
+{
+
+class VideoState;
 
 class VideoReader
 {
 public:
-  explicit VideoReader();
-  ~VideoReader();
+  explicit VideoReader() = default;
+  ~VideoReader() = default;
 
-  int start(const std::string filename, const int audioDeviceIndex);
-  int quitStatus() { return m_videoState->quit; }
+  int start(const std::string& filename, const int& audioDeviceIndex);
+  void stop();
+  bool isFinished() const { return m_isFinished; }
 
 private:
-  VideoDecoder* m_videoDecoder;
-  VideoRenderer* m_videoRenderer;
-  VideoState* m_videoState;
+  std::shared_ptr<VideoState> m_videoState = nullptr;
+  std::unique_ptr<VideoDecoder> m_videoDecoder = nullptr;
+  std::unique_ptr<VideoRenderer> m_videoRenderer = nullptr;
+  std::string m_filename = "";
+  std::atomic_bool m_isFinished = false;
 
-  int stream_component_open(VideoState *videoState, int stream_index);
-  int read_thread(void *arg);
+  int streamComponentOpen(std::shared_ptr<VideoState> vs, const int& streamIndex);
+  int readThread(std::shared_ptr<VideoState> vs);
 };
+
+}
 
 #endif // VIDEO_READER_H_

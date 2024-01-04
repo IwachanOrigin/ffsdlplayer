@@ -28,7 +28,7 @@ static inline int getOutputAudioDeviceList(std::vector<std::wstring> &vec)
   {
     const char* audioDeviceName = SDL_GetAudioDeviceName(i, 0);
     std::string mcAudioDeviceName = std::string(audioDeviceName);
-    std::wstring wcAudioDeviceName = UTF8ToUnicode(mcAudioDeviceName);
+    std::wstring wcAudioDeviceName = stringHelper::stringToWstring(mcAudioDeviceName);
     vec.push_back(wcAudioDeviceName);
   }
   return deviceNum;
@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
   }
 
   std::string progName = std::string(argv[0]);
-  std::wstring wsProgName = UTF8ToUnicode(progName);
+  std::wstring wsProgName = stringHelper::stringToWstring(progName);
   if (argc != 3)
   {
     usage(wsProgName);
@@ -91,18 +91,24 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  std::unique_ptr<VideoReader> videoReader = std::make_unique<VideoReader>();
+  std::unique_ptr<player::VideoReader> videoReader = std::make_unique<player::VideoReader>();
   std::string filename = std::string(argv[1]);
   videoReader->start(filename, outputAudioDevIndex);
   while(1)
   {
     std::chrono::milliseconds duration(1000);
     std::this_thread::sleep_for(duration);
-    if (videoReader->quitStatus())
+    if (videoReader->isFinished())
     {
+      videoReader->stop();
       break;
     }
   }
+
+  //
+  SDL_VideoQuit();
+  SDL_AudioQuit();
+  SDL_Quit();
 
   std::wcout << "finished." << std::endl;
   return 0;
