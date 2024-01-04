@@ -104,7 +104,7 @@ apt policy libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev libavdev
     powershell.exe cmake -S . -B build -G "\"Ninja Multi-Config"\" -D FFMPEG_PATH="/path/to/ffmpeg" -D SDL2_PATH="/path/to/sdl2"  
 
 ``` shell
-powershell.exe cmake -S . -B build -G "\"Ninja Multi-Config"\" -D FFMPEG_PATH="C:\software\ffmpeg-n6.0-latest-win64-lgpl-shared-6.0" -D SDL2_PATH="C:\software\SDL2-2.28.1"  
+powershell.exe cmake -S . -B build -G "\"Ninja Multi-Config\"" -D FFMPEG_PATH="C:\software\ffmpeg-n6.0-latest-win64-lgpl-shared-6.0" -D SDL2_PATH="C:\software\SDL2-2.28.1"  
 powershell.exe cmake --build build  
 ```
 
