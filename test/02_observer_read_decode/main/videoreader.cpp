@@ -1,6 +1,7 @@
 
-#include <thread>
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 #include "videoreader.h"
 #include "globalstate.h"
@@ -8,6 +9,11 @@
 #define MAX_QUEUE_SIZE (15 * 1024 * 1024)
 
 using namespace player;
+
+VideoReader::~VideoReader()
+{
+  this->stop();
+}
 
 int VideoReader::start(std::shared_ptr<GlobalState> gs)
 {
@@ -48,9 +54,12 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
     return -1;
   }
 
-  //
+  // Init stream index.
   auto& videoStreamIndex = m_gs->videoStreamIndex();
   auto& audioStreamIndex = m_gs->audioStreamIndex();
+
+  // Init
+  std::chrono::milliseconds delayms(10);
 
   // main decode loop. read in a packet and put it on the queue
   while (1)
@@ -65,7 +74,7 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
       globalState->clearVideoPacketRead();
 
       // wait for audio and video queues to decrease size
-      SDL_Delay(10);
+      std::this_thread::sleep_for(delayms);
       continue;
     }
     // read data from the AVFormatContext by repeatedly calling av_read_frame
@@ -83,7 +92,7 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
         // wait for the rest of the program to end
         while (globalState->nbPacketsAudioRead() > 0 && globalState->nbPacketsVideoRead() > 0)
         {
-          SDL_Delay(10);
+          std::this_thread::sleep_for(delayms);
         }
 
         // media EOF reached, quit
@@ -92,7 +101,7 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
       else if (formatCtx->pb->error == 0)
       {
         // no read error, wait for user input
-        SDL_Delay(10);
+        std::this_thread::sleep_for(delayms);
         continue;
       }
       else

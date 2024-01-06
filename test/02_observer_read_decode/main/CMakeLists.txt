@@ -1,5 +1,7 @@
 
 set(main_src
+  framequeue.cpp
+  framequeue.h
   globalstate.cpp
   globalstate.h
   main.cpp
@@ -10,10 +12,12 @@ set(main_src
   stringhelper.h
   subject.cpp
   subject.h
-  videoreader.cpp
-  videoreader.h
   videocontroller.cpp
   videocontroller.h
+  videodecoder.cpp
+  videodecoder.h
+  videoreader.cpp
+  videoreader.h
 )
 
 add_executable(

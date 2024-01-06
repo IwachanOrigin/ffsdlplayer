@@ -18,6 +18,7 @@ extern "C"
 
 #include <memory>
 
+#include "framequeue.h"
 #include "packetqueue.h"
 
 namespace player
@@ -39,14 +40,13 @@ struct VideoState
   AVFormatContext* inputFmtCtx = nullptr;
   AVPacket* flushPkt = nullptr;
   bool fileReadEnd = false;
-  struct SwsContext* swsCtx = nullptr;
 
-  // For Video
+  // For common the video
   AVCodecContext* videoCodecCtx = nullptr;
   AVStream* videoStream = nullptr;
   int videoStreamIndex = -1;
 
-  // For Audio
+  // For common the audio
   AVCodecContext* audioCodecCtx = nullptr;
   AVStream* audioStream = nullptr;
   int audioStreamIndex = -1;
@@ -54,6 +54,29 @@ struct VideoState
   // For reader
   PacketQueue audioPacketQueueRead;
   PacketQueue videoPacketQueueRead;
+
+  // For decoder
+  // decode the video
+  FrameQueue videoFrameQueueDecoded;
+  struct SwsContext* decodeVideoSwsCtx = nullptr;
+  double videoClock = 0.0;
+  double frameDecodeTimer = 0.0;
+  double frameDecodeLastPts = 0.0;
+  double frameDecodeLastDelay = 0.0;
+  double videoDecodeCurrentPts = 0.0;
+  int64_t videoDecodeCurrentPtsTime = 0;
+
+  // decode the audio
+  FrameQueue audioFrameQueueDecoded;
+  struct SwrContext* decodeAudioSwrCtx = nullptr;
+  double audioClock = 0.0;
+  unsigned int audioBufSize = 0;
+  unsigned int audioBufIndex = 0;
+  int audioPktSize = 0;
+
+  // For sync
+  double externalClock = 0.0;
+  int64_t externalClockTime = 0;
 };
 
 class GlobalState
@@ -86,6 +109,31 @@ public:
   int nbPacketsVideoRead() const { return m_vs->videoPacketQueueRead.nbPackets(); }
   void clearAudioPacketRead() const { m_vs->audioPacketQueueRead.clear(); }
   void clearVideoPacketRead() const { m_vs->videoPacketQueueRead.clear(); }
+
+  // For Decode
+  struct SwsContext*& decodeVideoSwsCtx() const { return m_vs->decodeVideoSwsCtx; }
+  struct SwrContext*& decodeAudioSwrCtx() const { return m_vs->decodeAudioSwrCtx; }
+  int pushVideoFrameDecoded(AVFrame* frame);
+  int pushAudioFrameDecoded(AVFrame* frame);
+  int popVideoFrameDecoded(AVFrame* frame);
+  int popAudioFrameDecoded(AVFrame* frame);
+  int sizeVideoFrameDecoded() const { return m_vs->videoFrameQueueDecoded.size(); }
+  int sizeAudioFrameDecoded() const { return m_vs->audioFrameQueueDecoded.size(); }
+  void clearAudioFrameDecoded() const { m_vs->audioFrameQueueDecoded.clear(); }
+  void clearVideoFrameDecoded() const { m_vs->videoFrameQueueDecoded.clear(); }
+
+  double frameDecodeTimer() const { return m_vs->frameDecodeTimer; }
+  void setFrameDecodeTimer(const double& frameTimer) { m_vs->frameDecodeTimer = frameTimer; }
+  double frameDecodeLastPts() const { return m_vs->frameDecodeLastPts; }
+  void setFrameDecodeLastPts(const double& frameLastPts) { m_vs->frameDecodeLastPts = frameLastPts; }
+  double frameDecodeLastDelay() const { return m_vs->frameDecodeLastDelay; }
+  void setFrameDecodeLastDelay(const double& frameLastDelay) { m_vs->frameDecodeLastDelay = frameLastDelay; }
+  double videoClock() const { return m_vs->videoClock; }
+  void setVideoClock(const double& videoClock) { m_vs->videoClock = videoClock; }
+  double videoDecodeCurrentPts() const { return m_vs->videoDecodeCurrentPts; }
+  void setVideoDecodeCurrentPts(const double& videoCurrentPts) { m_vs->videoDecodeCurrentPts = videoCurrentPts; }
+  int64_t videoDecodeCurrentPtsTime() const { return m_vs->videoDecodeCurrentPtsTime; }
+  void setVideoDecodeCurrentPtsTime(const int64_t& videoCurrentPtsTime) { m_vs->videoDecodeCurrentPtsTime = videoCurrentPtsTime; }
 
 private:
   std::unique_ptr<VideoState> m_vs;

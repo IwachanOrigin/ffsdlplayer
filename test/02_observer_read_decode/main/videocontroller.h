@@ -5,6 +5,7 @@
 #include "observer.h"
 #include "globalstate.h"
 #include "videoreader.h"
+#include "videodecoder.h"
 
 #include <atomic>
 
@@ -21,11 +22,12 @@ public:
   bool isVideoFinished() const { return m_isVideoFinished; }
 
   // From Observer class
-  virtual void update(Subject* observer);
+  virtual void update(Subject* subject);
 
 private:
   std::shared_ptr<GlobalState> m_globalState = nullptr;
   std::unique_ptr<VideoReader> m_primaryVideoReader = nullptr;
+  std::unique_ptr<VideoDecoder> m_primaryVideoDecoder = nullptr;
 
   std::atomic_bool m_isVideoFinished = false;
 };

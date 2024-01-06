@@ -36,10 +36,10 @@ GlobalState::~GlobalState()
     m_vs->videoCodecCtx = nullptr;
   }
 
-  if (m_vs->swsCtx)
+  if (m_vs->decodeVideoSwsCtx)
   {
-    sws_freeContext(m_vs->swsCtx);
-    m_vs->swsCtx = nullptr;
+    sws_freeContext(m_vs->decodeVideoSwsCtx);
+    m_vs->decodeVideoSwsCtx = nullptr;
   }
 
   if (m_vs->inputFmtCtx)
@@ -135,6 +135,30 @@ int GlobalState::popVideoPacketRead(AVPacket* packet)
 {
   int ret = m_vs->videoPacketQueueRead.pop(packet);
   return (packet == nullptr) ? -1 : ret;
+}
+
+// AVFrame - Decode
+
+int GlobalState::pushVideoFrameDecoded(AVFrame* frame)
+{
+  return m_vs->videoFrameQueueDecoded.push(frame);
+}
+
+int GlobalState::pushAudioFrameDecoded(AVFrame* frame)
+{
+  return m_vs->audioFrameQueueDecoded.push(frame);
+}
+
+int GlobalState::popVideoFrameDecoded(AVFrame* frame)
+{
+  int ret = m_vs->videoFrameQueueDecoded.pop(frame);
+  return (frame == nullptr) ? -1 : 0;
+}
+
+int GlobalState::popAudioFrameDecoded(AVFrame* frame)
+{
+  int ret = m_vs->audioFrameQueueDecoded.pop(frame);
+  return (frame == nullptr) ? -1 : 0;
 }
 
 int GlobalState::setupComponent(const int& streamIndex)

@@ -12,28 +12,29 @@ extern "C"
 #include <libswresample/swresample.h>
 }
 
-#include "videostate.h"
+#include "subject.h"
+#include "globalstate.h"
 
 namespace player
 {
 
-class VideoDecoder
+class VideoDecoder : public Subject
 {
 public:
-  explicit VideoDecoder() = default;
-  ~VideoDecoder();
+  explicit VideoDecoder() : Subject() {}
+  virtual ~VideoDecoder();
 
-  int start(std::shared_ptr<VideoState> vs);
+  int start(std::shared_ptr<GlobalState> vs);
   void stop();
 
 private:
-  std::shared_ptr<VideoState> m_vs = nullptr;
+  std::shared_ptr<GlobalState> m_gs = nullptr;
   std::mutex m_mutex;
   bool m_finishedDecoder = false;
 
-  int decodeThread(std::shared_ptr<VideoState> vs);
+  int decodeThread(std::shared_ptr<GlobalState> vs);
   int64_t guessCorrectPts(AVCodecContext* ctx, const int64_t& reordered_pts, const int64_t& dts);
-  double syncVideo(std::shared_ptr<VideoState> vs, AVFrame* srcFrame, double pts);
+  double syncVideo(std::shared_ptr<GlobalState> vs, AVFrame* srcFrame, double pts);
 };
 
 } // player
