@@ -12,6 +12,8 @@ set(main_src
   subject.h
   videoreader.cpp
   videoreader.h
+  videocontroller.cpp
+  videocontroller.h
 )
 
 add_executable(

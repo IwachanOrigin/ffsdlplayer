@@ -5,7 +5,6 @@
 extern "C"
 {
 #include "libavcodec/avcodec.h"
-#include "libavfilter/avfilter.h"
 #include "libavformat/avformat.h"
 #include "libavutil/avutil.h"
 #include "libswresample/swresample.h"
@@ -18,10 +17,7 @@ extern "C"
 }
 
 #include <memory>
-#include <mutex>
-#include <condition_variable>
 
-#include "framequeue.h"
 #include "packetqueue.h"
 
 namespace player
@@ -46,19 +42,18 @@ struct VideoState
   struct SwsContext* swsCtx = nullptr;
 
   // For Video
-  AVCodecContext* videoCtx = nullptr;
+  AVCodecContext* videoCodecCtx = nullptr;
   AVStream* videoStream = nullptr;
-  int video_stream_index = -1;
+  int videoStreamIndex = -1;
 
   // For Audio
-  AVCodecContext* audioCtx = nullptr;
+  AVCodecContext* audioCodecCtx = nullptr;
   AVStream* audioStream = nullptr;
-  int audio_stream_index = -1;
+  int audioStreamIndex = -1;
 
   // For reader
   PacketQueue audioPacketQueueRead;
   PacketQueue videoPacketQueueRead;
-
 };
 
 class GlobalState
@@ -67,36 +62,36 @@ public:
   explicit GlobalState();
   ~GlobalState();
 
+  // Init
+  int setup(const std::string& filename);
+
   // Common
-  AVFormatContext*& inputFmtCtx() const { return m_videoState->inputFmtCtx; }
-  int& videoStreamIndex() const { return m_videoState->video_stream_index; }
-  int& audioStreamIndex() const { return m_videoState->audio_stream_index; }
-  AVPacket*& flushPacket() const { return m_videoState->flushPkt; }
-  AVCodecContext*& videoCodecCtx() const { return m_videoState->videoCtx; }
-  AVStream*& videoStream() const { return m_videoState->videoStream; }
-  AVCodecContext*& audioCodecCtx() const { return m_videoState->audioCtx; }
-  AVStream*& audioStream() const { return m_videoState->audioStream; }
+  AVFormatContext*& inputFmtCtx() const { return m_vs->inputFmtCtx; }
+  int& videoStreamIndex() const { return m_vs->videoStreamIndex; }
+  int& audioStreamIndex() const { return m_vs->audioStreamIndex; }
+  AVPacket*& flushPacket() const { return m_vs->flushPkt; }
+  AVCodecContext*& videoCodecCtx() const { return m_vs->videoCodecCtx; }
+  AVStream*& videoStream() const { return m_vs->videoStream; }
+  AVCodecContext*& audioCodecCtx() const { return m_vs->audioCodecCtx; }
+  AVStream*& audioStream() const { return m_vs->audioStream; }
 
   // For Read
   int pushAudioPacketRead(AVPacket* packet);
   int pushVideoPacketRead(AVPacket* packet);
   int popAudioPacketRead(AVPacket* packet);
   int popVideoPacketRead(AVPacket* packet);
-  int sizeAudioPacketRead() const { return m_videoState->audioPacketQueueRead.size(); }
-  int sizeVideoPacketRead() const { return m_videoState->videoPacketQueueRead.size(); }
-  int nbPacketsAudioRead() const { return m_videoState->audioPacketQueueRead.nbPackets(); }
-  int nbPacketsVideoRead() const { return m_videoState->videoPacketQueueRead.nbPackets(); }
-  void clearAudioPacketRead() const { m_videoState->audioPacketQueueRead.clear(); }
-  void clearVideoPacketRead() const { m_videoState->videoPacketQueueRead.clear(); }
+  int sizeAudioPacketRead() const { return m_vs->audioPacketQueueRead.size(); }
+  int sizeVideoPacketRead() const { return m_vs->videoPacketQueueRead.size(); }
+  int nbPacketsAudioRead() const { return m_vs->audioPacketQueueRead.nbPackets(); }
+  int nbPacketsVideoRead() const { return m_vs->videoPacketQueueRead.nbPackets(); }
+  void clearAudioPacketRead() const { m_vs->audioPacketQueueRead.clear(); }
+  void clearVideoPacketRead() const { m_vs->videoPacketQueueRead.clear(); }
 
 private:
-  std::unique_ptr<VideoState> m_videoState;
+  std::unique_ptr<VideoState> m_vs;
   SYNC_TYPE m_clockSyncType;
 
-  // Caluculation clock
-  double calcVideoClock();
-  double calcAudioClock();
-  double calcExternalClock();
+  int setupComponent(const int& streamIndex);
 };
 
 } // player

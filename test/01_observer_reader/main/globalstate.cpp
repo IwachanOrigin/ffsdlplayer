@@ -1,16 +1,17 @@
 
 #include "globalstate.h"
+#include <iostream>
 
 using namespace player;
 
 GlobalState::GlobalState()
 {
-  m_videoState = std::make_unique<VideoState>();
+  m_vs = std::make_unique<VideoState>();
   // For reader
-  m_videoState->audioPacketQueueRead.init();
-  m_videoState->videoPacketQueueRead.init();
-  m_videoState->flushPkt = av_packet_alloc();
-  m_videoState->flushPkt->data = (uint8_t*)"FLUSH";
+  m_vs->audioPacketQueueRead.init();
+  m_vs->videoPacketQueueRead.init();
+  m_vs->flushPkt = av_packet_alloc();
+  m_vs->flushPkt->data = (uint8_t*)"FLUSH";
   // For clock
   m_clockSyncType = SYNC_TYPE::AV_SYNC_AUDIO_MASTER;
 }
@@ -18,131 +19,172 @@ GlobalState::GlobalState()
 GlobalState::~GlobalState()
 {
   // For reader
-  m_videoState->audioPacketQueueRead.clear();
-  m_videoState->videoPacketQueueRead.clear();
-  // For Decoder
-  m_videoState->videoFrameQueueDecoded.clear();
+  m_vs->audioPacketQueueRead.clear();
+  m_vs->videoPacketQueueRead.clear();
 
-  if (m_videoState->audioCtx)
+  if (m_vs->audioCodecCtx)
   {
-    avcodec_close(m_videoState->audioCtx);
-    avcodec_free_context(&m_videoState->audioCtx);
-    m_videoState->audioCtx = nullptr;
+    avcodec_close(m_vs->audioCodecCtx);
+    avcodec_free_context(&m_vs->audioCodecCtx);
+    m_vs->audioCodecCtx = nullptr;
   }
 
-  if (m_videoState->videoCtx)
+  if (m_vs->videoCodecCtx)
   {
-    avcodec_close(m_videoState->videoCtx);
-    avcodec_free_context(&m_videoState->videoCtx);
-    m_videoState->videoCtx = nullptr;
+    avcodec_close(m_vs->videoCodecCtx);
+    avcodec_free_context(&m_vs->videoCodecCtx);
+    m_vs->videoCodecCtx = nullptr;
   }
 
-  if (m_videoState->swsCtx)
+  if (m_vs->swsCtx)
   {
-    sws_freeContext(m_videoState->swsCtx);
-    m_videoState->swsCtx = nullptr;
+    sws_freeContext(m_vs->swsCtx);
+    m_vs->swsCtx = nullptr;
   }
 
-  if (m_videoState->decodeAudioSwrCtx)
+  if (m_vs->inputFmtCtx)
   {
-    swr_free(&m_videoState->decodeAudioSwrCtx);
-    m_videoState->decodeAudioSwrCtx = nullptr;
+    avformat_close_input(&m_vs->inputFmtCtx);
+    avformat_free_context(m_vs->inputFmtCtx);
+    m_vs->inputFmtCtx = nullptr;
   }
 
-  if (m_videoState->inputFmtCtx)
+  if (m_vs->flushPkt)
   {
-    avformat_close_input(&m_videoState->inputFmtCtx);
-    avformat_free_context(m_videoState->inputFmtCtx);
-    m_videoState->inputFmtCtx = nullptr;
+    av_packet_unref(m_vs->flushPkt);
+    m_vs->flushPkt = nullptr;
+  }
+}
+
+int GlobalState::setup(const std::string& filename)
+{
+  auto ret = avformat_open_input(&m_vs->inputFmtCtx, filename.c_str(), nullptr, nullptr);
+  if (ret < 0)
+  {
+    std::cerr << "Could not open file " << filename << std::endl;
+    return -1;
   }
 
-  if (m_videoState->flushPkt)
+  // reset streamindex
+  m_vs->videoStreamIndex = -1;
+  m_vs->audioStreamIndex = -1;
+
+  // read packets of the media file to get stream info
+  ret = avformat_find_stream_info(m_vs->inputFmtCtx, nullptr);
+  if (ret < 0)
   {
-    av_packet_unref(m_videoState->flushPkt);
-    m_videoState->flushPkt = nullptr;
+    std::cerr << "Could not find stream info " << filename << std::endl;
+    return -1;
   }
+
+  // dump info about file onto standard error
+  av_dump_format(m_vs->inputFmtCtx, 0, filename.c_str(), 0);
+
+  // loop through the streams that have been found
+  for (int i = 0; i < m_vs->inputFmtCtx->nb_streams; i++)
+  {
+    // look for the video stream
+    if (m_vs->inputFmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && m_vs->videoStreamIndex < 0)
+    {
+      m_vs->videoStreamIndex = i;
+    }
+
+    // look for the audio stream
+    if (m_vs->inputFmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO && m_vs->audioStreamIndex < 0)
+    {
+      m_vs->audioStreamIndex = i;
+    }
+  }
+
+  // return with error in case no video stream was found
+  if (m_vs->videoStreamIndex == -1)
+  {
+    std::cerr << "Could not open video stream" << std::endl;
+    return -1;
+  }
+
+  ret = this->setupComponent(m_vs->videoStreamIndex);
+  if (ret < 0)
+  {
+    std::cerr << "Could not setup video component." << std::endl;
+    return -1;
+  }
+
+  return 0;
 }
 
 // AVPacket - Read
 
 int GlobalState::pushAudioPacketRead(AVPacket* packet)
 {
-  return m_videoState->audioPacketQueueRead.push(packet);
+  return m_vs->audioPacketQueueRead.push(packet);
 }
 
 int GlobalState::pushVideoPacketRead(AVPacket* packet)
 {
-  return m_videoState->videoPacketQueueRead.push(packet);
+  return m_vs->videoPacketQueueRead.push(packet);
 }
 
 int GlobalState::popAudioPacketRead(AVPacket* packet)
 {
-  int ret = m_videoState->audioPacketQueueRead.pop(packet);
+  int ret = m_vs->audioPacketQueueRead.pop(packet);
   return (packet == nullptr) ? -1 : ret;
 }
 
 int GlobalState::popVideoPacketRead(AVPacket* packet)
 {
-  int ret = m_videoState->videoPacketQueueRead.pop(packet);
+  int ret = m_vs->videoPacketQueueRead.pop(packet);
   return (packet == nullptr) ? -1 : ret;
 }
 
-// Calculation master clock
-double GlobalState::calcMasterClock()
+int GlobalState::setupComponent(const int& streamIndex)
 {
-  switch(m_clockSyncType)
+  // check the given stream index in valid
+  if (streamIndex < 0 || streamIndex >= m_vs->inputFmtCtx->nb_streams)
   {
-    case SYNC_TYPE::AV_SYNC_VIDEO_MASTER:
-    {
-      return this->calcVideoClock();
-    }
-    break;
+    std::cerr << "invalid stream index" << std::endl;
+    return -1;
+  }
 
-    case SYNC_TYPE::AV_SYNC_AUDIO_MASTER:
-    {
-      return this->calcAudioClock();
-    }
-    break;
+  // retrieve codec for the given stream index
+  const AVCodec* codec = avcodec_find_decoder(m_vs->inputFmtCtx->streams[streamIndex]->codecpar->codec_id);
+  if (codec == nullptr)
+  {
+    std::cerr << "unsupported codec" << std::endl;
+    return -1;
+  }
 
-    case SYNC_TYPE::AV_SYNC_EXTERNAL_MASTER:
+  // retrieve codec context
+  AVCodecContext* codecCtx = avcodec_alloc_context3(codec);
+
+  // use multi core
+  // fhd, 60p = 1 threads
+  // 4k, 60p  = 4 threads
+  //codecCtx->thread_count = 4;
+  //codecCtx->thread_type = FF_THREAD_FRAME;
+
+  int ret = avcodec_parameters_to_context(codecCtx, m_vs->inputFmtCtx->streams[streamIndex]->codecpar);
+  if (ret != 0)
+  {
+    std::cerr << "Could not copy codec context" << std::endl;
+    return -1;
+  }
+
+  // init the AVCodecContext to use the given AVCodec
+  if (avcodec_open2(codecCtx, codec, nullptr) < 0)
+  {
+    std::cerr << "unsupported codec" << std::endl;
+    return -1;
+  }
+
+  switch (codecCtx->codec_type)
+  {
+    case AVMEDIA_TYPE_VIDEO:
     {
-      return this->calcExternalClock();
+      m_vs->videoCodecCtx = std::move(codecCtx);
+      m_vs->videoStream = m_vs->inputFmtCtx->streams[streamIndex];
     }
     break;
   }
-  return -1;
-}
-
-double GlobalState::calcVideoClock()
-{
-  double delta = (av_gettime() - m_videoState->videoDecodeCurrentPtsTime) / 1000000.0;
-  return m_videoState->videoDecodeCurrentPts + delta;
-}
-
-double GlobalState::calcAudioClock()
-{
-  double pts = m_videoState->audioClock;
-  int hw_buf_size = m_videoState->audioBufSize - m_videoState->audioBufIndex;
-  int bytes_per_sec = 0;
-  int n = 2 * m_videoState->audioCtx->ch_layout.nb_channels;
-
-  if (m_videoState->audioStream)
-  {
-    bytes_per_sec = m_videoState->audioCtx->sample_rate * n;
-  }
-
-  if (bytes_per_sec)
-  {
-    pts -= (double)hw_buf_size / bytes_per_sec;
-  }
-
-  return pts;
-}
-
-double GlobalState::calcExternalClock()
-{
-  m_videoState->externalClockTime = av_gettime();
-  m_videoState->externalClock = m_videoState->externalClockTime / 1000000.0;
-
-  return m_videoState->externalClock;
+  return 0;
 }

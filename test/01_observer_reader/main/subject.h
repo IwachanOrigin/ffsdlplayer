@@ -3,7 +3,6 @@
 #define SUBJECT_H_
 
 #include <vector>
-#include <memory>
 
 namespace player
 {
@@ -16,14 +15,14 @@ public:
   explicit Subject() = default;
   virtual ~Subject() = default;
 
-  void addObserver(std::shared_ptr<Observer> observer);
-  void deleteObserver(std::shared_ptr<Observer> observer);
+  void addObserver(Observer* observer);
+  void deleteObserver(Observer* observer);
 
 protected:
   void notifyObservers();
 
 private:
-  std::vector<std::shared_ptr<Observer>> m_observers;
+  std::vector<Observer*> m_observers;
 
 };
 

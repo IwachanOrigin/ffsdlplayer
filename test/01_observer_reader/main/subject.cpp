@@ -4,7 +4,7 @@
 
 using namespace player;
 
-void Subject::addObserver(std::shared_ptr<Observer> observer)
+void Subject::addObserver(Observer* observer)
 {
   auto itr = std::find(m_observers.begin(), m_observers.end(), observer);
   if (itr == m_observers.end())
@@ -13,7 +13,7 @@ void Subject::addObserver(std::shared_ptr<Observer> observer)
   }
 }
 
-void Subject::deleteObserver(std::shared_ptr<Observer> observer)
+void Subject::deleteObserver(Observer* observer)
 {
   auto itr = std::find(m_observers.begin(), m_observers.end(), observer);
   if (itr != m_observers.end())

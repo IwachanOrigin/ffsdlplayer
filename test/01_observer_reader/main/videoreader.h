@@ -20,33 +20,27 @@ extern "C"
 #include <SDL_thread.h>
 }
 
-#include "videorenderer.h"
-#include "videodecoder.h"
+#include "subject.h"
 
 namespace player
 {
 
-class VideoState;
+class GlobalState;
 
-class VideoReader
+class VideoReader : public Subject
 {
 public:
-  explicit VideoReader() = default;
+  explicit VideoReader() : Subject() {}
   ~VideoReader() = default;
 
-  int start(const std::string& filename, const int& audioDeviceIndex);
+  int start(std::shared_ptr<GlobalState> gs);
   void stop();
-  bool isFinished() const { return m_isFinished; }
 
 private:
-  std::shared_ptr<VideoState> m_videoState = nullptr;
-  std::unique_ptr<VideoDecoder> m_videoDecoder = nullptr;
-  std::unique_ptr<VideoRenderer> m_videoRenderer = nullptr;
-  std::string m_filename = "";
+  std::shared_ptr<GlobalState> m_gs = nullptr;
   std::atomic_bool m_isFinished = false;
 
-  int streamComponentOpen(std::shared_ptr<VideoState> vs, const int& streamIndex);
-  int readThread(std::shared_ptr<VideoState> vs);
+  int readThread(std::shared_ptr<GlobalState> gs);
 };
 
 }
