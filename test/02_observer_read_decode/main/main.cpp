@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
   VideoController vc;
   vc.start(argv[1]);
   std::chrono::milliseconds ms(100);
-  while(!vc.isVideoFinished())
+  while(!vc.isFinished())
   {
     std::this_thread::sleep_for(ms);
   }

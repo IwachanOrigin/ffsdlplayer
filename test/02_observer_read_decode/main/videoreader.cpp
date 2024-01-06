@@ -10,6 +10,12 @@
 
 using namespace player;
 
+VideoReader::VideoReader()
+  : Subject()
+{
+  this->setSubjectType(SubjectType::Reader);
+}
+
 VideoReader::~VideoReader()
 {
   this->stop();
@@ -67,12 +73,6 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
     // check audio and video packets queues size
     if (globalState->sizeAudioPacketRead() + globalState->sizeVideoPacketRead() > MAX_QUEUE_SIZE)
     {
-      // !!!!!!!
-      // !!!!!!! Delete code to future. !!!!!!!
-      // !!!!!!!
-      globalState->clearAudioPacketRead();
-      globalState->clearVideoPacketRead();
-
       // wait for audio and video queues to decrease size
       std::this_thread::sleep_for(delayms);
       continue;
@@ -83,12 +83,6 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
     {
       if (ret == AVERROR_EOF)
       {
-        // !!!!!!!
-        // !!!!!!! Delete code to future. !!!!!!!
-        // !!!!!!!
-        globalState->clearAudioPacketRead();
-        globalState->clearVideoPacketRead();
-
         // wait for the rest of the program to end
         while (globalState->nbPacketsAudioRead() > 0 && globalState->nbPacketsVideoRead() > 0)
         {

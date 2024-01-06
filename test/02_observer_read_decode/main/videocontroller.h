@@ -19,7 +19,7 @@ public:
   virtual ~VideoController();
 
   void start(const std::string& filename);
-  bool isVideoFinished() const { return m_isVideoFinished; }
+  bool isFinished() const { return m_isFinished; }
 
   // From Observer class
   virtual void update(Subject* subject);
@@ -29,7 +29,9 @@ private:
   std::unique_ptr<VideoReader> m_primaryVideoReader = nullptr;
   std::unique_ptr<VideoDecoder> m_primaryVideoDecoder = nullptr;
 
-  std::atomic_bool m_isVideoFinished = false;
+  std::atomic_bool m_isFinished = false;
+  std::atomic_bool m_isVideoReaderFinished = false;
+  std::atomic_bool m_isVideoDecoderFinished = false;
 };
 
 } // player

@@ -21,7 +21,7 @@ namespace player
 class VideoDecoder : public Subject
 {
 public:
-  explicit VideoDecoder() : Subject() {}
+  explicit VideoDecoder();
   virtual ~VideoDecoder();
 
   int start(std::shared_ptr<GlobalState> vs);

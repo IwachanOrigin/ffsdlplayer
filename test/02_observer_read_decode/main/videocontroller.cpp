@@ -20,29 +20,48 @@ VideoController::~VideoController()
 
 void VideoController::update(Subject* subject)
 {
-  // VideoReader
+  auto subjectType = subject->subjectType();
+  switch(subjectType)
   {
-    auto videoReader = static_cast<VideoReader*>(subject);
-    if (videoReader)
+    case player::SubjectType::Reader:
     {
-      std::cout << "VideoReader finished." << std::endl;
-      m_isVideoFinished = true;
-    }
-  }
-
-  // VideoDecoder
-  {
-    auto videoDecoder = static_cast<VideoDecoder*>(subject);
-    if (videoDecoder)
-    {
-      if (m_isVideoFinished)
+      auto videoReader = static_cast<VideoReader*>(subject);
+      if (videoReader)
       {
-        m_primaryVideoDecoder->stop();
-        std::chrono::milliseconds ms(100);
-        std::this_thread::sleep_for(ms);
-        std::cout << "VideoDecoder finished." << std::endl;
+        std::cout << "VideoReader finished." << std::endl;
+        m_isVideoReaderFinished = true;
       }
     }
+    break;
+
+    case player::SubjectType::Decoder:
+    {
+      auto videoDecoder = static_cast<VideoDecoder*>(subject);
+      if (videoDecoder)
+      {
+        if (m_isVideoReaderFinished)
+        {
+          m_primaryVideoDecoder->stop();
+          std::chrono::milliseconds ms(100);
+          std::this_thread::sleep_for(ms);
+          m_isFinished = true;
+          std::cout << "VideoDecoder finished." << std::endl;
+        }
+      }
+    }
+    break;
+
+    case player::SubjectType::Renderer:
+    {
+      //
+    }
+    break;
+
+    case player::SubjectType::None:
+    {
+      //
+    }
+    break;
   }
 }
 

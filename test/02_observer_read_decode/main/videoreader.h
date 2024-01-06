@@ -25,7 +25,7 @@ class GlobalState;
 class VideoReader : public Subject
 {
 public:
-  explicit VideoReader() : Subject() {}
+  explicit VideoReader();
   virtual ~VideoReader();
 
   int start(std::shared_ptr<GlobalState> gs);
