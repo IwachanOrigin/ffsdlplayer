@@ -86,7 +86,7 @@ public:
   ~GlobalState();
 
   // Init
-  int setup(const std::string& filename);
+  int setup(std::string_view filename);
 
   // Common
   AVFormatContext*& inputFmtCtx() const { return m_vs->inputFmtCtx; }

@@ -18,7 +18,7 @@ public:
   explicit VideoController();
   virtual ~VideoController();
 
-  void start(const std::string& filename);
+  void start(std::string_view filename);
   bool isFinished() const { return m_isFinished; }
 
   // From Observer class

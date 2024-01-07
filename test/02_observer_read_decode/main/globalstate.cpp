@@ -56,9 +56,9 @@ GlobalState::~GlobalState()
   }
 }
 
-int GlobalState::setup(const std::string& filename)
+int GlobalState::setup(std::string_view filename)
 {
-  auto ret = avformat_open_input(&m_vs->inputFmtCtx, filename.c_str(), nullptr, nullptr);
+  auto ret = avformat_open_input(&m_vs->inputFmtCtx, filename.data(), nullptr, nullptr);
   if (ret < 0)
   {
     std::cerr << "Could not open file " << filename << std::endl;
@@ -78,7 +78,7 @@ int GlobalState::setup(const std::string& filename)
   }
 
   // dump info about file onto standard error
-  av_dump_format(m_vs->inputFmtCtx, 0, filename.c_str(), 0);
+  av_dump_format(m_vs->inputFmtCtx, 0, filename.data(), 0);
 
   // loop through the streams that have been found
   for (int i = 0; i < m_vs->inputFmtCtx->nb_streams; i++)

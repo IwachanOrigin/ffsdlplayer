@@ -65,7 +65,7 @@ void VideoController::update(Subject* subject)
   }
 }
 
-void VideoController::start(const std::string& filename)
+void VideoController::start(std::string_view filename)
 {
   m_globalState->setup(filename);
   m_primaryVideoReader->start(m_globalState);
