@@ -20,10 +20,10 @@ VideoController::~VideoController()
 
 void VideoController::update(Subject* subject)
 {
-  auto subjectType = subject->subjectType();
-  switch(subjectType)
+  switch(auto subjectType = subject->subjectType(); subjectType)
   {
-    case player::SubjectType::Reader:
+    using enum player::SubjectType;
+    case Reader:
     {
       auto videoReader = static_cast<VideoReader*>(subject);
       if (videoReader)
@@ -34,7 +34,7 @@ void VideoController::update(Subject* subject)
     }
     break;
 
-    case player::SubjectType::Decoder:
+    case Decoder:
     {
       auto videoDecoder = static_cast<VideoDecoder*>(subject);
       if (videoDecoder)
@@ -51,13 +51,13 @@ void VideoController::update(Subject* subject)
     }
     break;
 
-    case player::SubjectType::Renderer:
+    case Renderer:
     {
       //
     }
     break;
 
-    case player::SubjectType::None:
+    case None:
     {
       //
     }
