@@ -15,12 +15,6 @@ enum class SubjectType
   , Renderer
 };
 
-enum class SubjectMode
-{
-  Primary = 0
-  , Secondary
-};
-
 class Observer;
 
 class Subject
@@ -35,9 +29,6 @@ public:
 
   SubjectType subjectType() const { return m_subjectType; }
 
-  SubjectMode subjectMode() const { return m_subjectMode; }
-  void setSubjectMode(const SubjectMode& mode) { m_subjectMode = mode; }
-
 protected:
   void notifyObservers();
   void setSubjectType(const SubjectType& type) { m_subjectType = type; }
@@ -45,7 +36,6 @@ protected:
 private:
   std::vector<Observer*> m_observers;
   SubjectType m_subjectType = SubjectType::None;
-  SubjectMode m_subjectMode = SubjectMode::Primary;
 };
 
 } // player
