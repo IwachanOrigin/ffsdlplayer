@@ -6,6 +6,7 @@
 #include "globalstate.h"
 #include "videoreader.h"
 #include "videodecoder.h"
+#include "videorenderer.h"
 
 #include <atomic>
 
@@ -29,6 +30,7 @@ private:
   std::shared_ptr<GlobalState> m_secondaryGlobalState = nullptr;
   std::unique_ptr<VideoReader> m_videoReader = nullptr;
   std::unique_ptr<VideoDecoder> m_videoDecoder = nullptr;
+  std::unique_ptr<VideoRenderer> m_videoRenderer = nullptr;
 
   std::atomic_bool m_isFinished = false;
   std::atomic_bool m_isVideoReaderFinished = false;

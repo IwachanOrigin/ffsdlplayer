@@ -135,11 +135,34 @@ public:
   int64_t videoDecodeCurrentPtsTime() const { return m_vs->videoDecodeCurrentPtsTime; }
   void setVideoDecodeCurrentPtsTime(const int64_t& videoCurrentPtsTime) { m_vs->videoDecodeCurrentPtsTime = videoCurrentPtsTime; }
 
+  // For calculate clock.
+  double masterClock();
+  double calcAudioClock(); // For AudioDecoder
+
+  // For Seek
+  int seekRequest() const { return m_seekReq; }
+  void setSeekRequest(const int& req) { m_seekReq = req; }
+  int64_t seekPos() const { return m_seekPos; }
+  int seekFlags() const { return m_seekFlags; }
+  void streamSeek(const int64_t& pos, const int& rel);
+
 private:
   std::unique_ptr<VideoState> m_vs;
   SYNC_TYPE m_clockSyncType;
 
+  // av sync
+  SYNC_TYPE m_avSyncType = SYNC_TYPE::AV_SYNC_AUDIO_MASTER;
+  double m_externalClock = 0.0;
+  int64_t m_externalClockTime = 0;
+
+  // seeking
+  int m_seekReq = 0;
+  int m_seekFlags = 0;
+  int64_t m_seekPos = 0;
+
   int setupComponent(const int& streamIndex);
+  double calcVideoClock();
+  double calcExternalClock();
 };
 
 } // player

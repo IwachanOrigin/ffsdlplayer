@@ -212,3 +212,76 @@ int GlobalState::setupComponent(const int& streamIndex)
   }
   return 0;
 }
+
+double GlobalState::masterClock()
+{
+  switch (m_avSyncType)
+  {
+    using enum SYNC_TYPE;
+    case AV_SYNC_VIDEO_MASTER:
+    {
+      return this->calcVideoClock();
+    }
+    break;
+
+    case AV_SYNC_AUDIO_MASTER:
+    {
+      return this->calcAudioClock();
+    }
+    break;
+
+    case AV_SYNC_EXTERNAL_MASTER:
+    {
+      return this->calcExternalClock();
+    }
+    break;
+  }
+
+  std::cerr << "Error : Undefined a/v sync type" << std::endl;
+  return -1;
+}
+
+double GlobalState::calcVideoClock()
+{
+  double delta = (av_gettime() - m_vs->videoDecodeCurrentPtsTime) / 1000000.0;
+  return m_vs->videoDecodeCurrentPts + delta;
+}
+
+double GlobalState::calcAudioClock()
+{
+  double pts = m_vs->audioClock;
+  int hwBufSize = m_vs->audioBufSize - m_vs->audioBufIndex;
+  int bytesPerSec = 0;
+  int n = 2 * m_vs->audioCodecCtx->ch_layout.nb_channels;
+
+  if (m_vs->audioStream)
+  {
+    bytesPerSec = m_vs->audioCodecCtx->sample_rate * n;
+  }
+
+  if (bytesPerSec)
+  {
+    pts -= (double) hwBufSize / bytesPerSec;
+  }
+
+  return pts;
+}
+
+double GlobalState::calcExternalClock()
+{
+  m_externalClockTime = av_gettime();
+  m_externalClock = m_externalClockTime / 1000000.0;
+
+  return m_externalClock;
+}
+
+void GlobalState::streamSeek(const int64_t& pos, const int& rel)
+{
+  if (!m_seekReq)
+  {
+    m_seekPos = pos;
+    m_seekFlags = rel < 0 ? AVSEEK_FLAG_BACKWARD : 0;
+    m_seekReq = 1;
+  }
+}
+

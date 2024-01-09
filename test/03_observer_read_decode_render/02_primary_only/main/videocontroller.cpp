@@ -13,6 +13,8 @@ VideoController::VideoController()
   m_videoReader->addObserver(this);
   m_videoDecoder = std::make_unique<VideoDecoder>();
   m_videoDecoder->addObserver(this);
+  m_videoRenderer = std::make_unique<VideoRenderer>();
+  m_videoRenderer->addObserver(this);
 
   // Secondary
   m_secondaryGlobalState = std::make_shared<GlobalState>();
@@ -68,7 +70,11 @@ void VideoController::update(Subject* subject)
 
     case Renderer:
     {
-      //
+      auto videoRenderer = static_cast<VideoRenderer*>(subject);
+      if (videoRenderer)
+      {
+        //
+      }
     }
     break;
 
