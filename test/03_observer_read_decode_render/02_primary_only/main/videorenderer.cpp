@@ -286,6 +286,10 @@ void VideoRenderer::videoRefreshTimer()
 
   // Show the frame on the sdl_surface
   this->videoDisplay(frame);
+
+  // wipe the frame
+  av_frame_free(&frame);
+  av_free(frame);
 }
 
 Uint32 VideoRenderer::sdlRefreshTimerCb(Uint32 interval, void* param)

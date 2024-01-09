@@ -73,7 +73,16 @@ void VideoController::update(Subject* subject)
       auto videoRenderer = static_cast<VideoRenderer*>(subject);
       if (videoRenderer)
       {
-        //
+        std::cout << "VideoRenderer finished." << std::endl;
+        m_finishedFileCount++;
+        if (m_finishedFileCount >= m_movFileVec.size())
+        {
+          m_isFinished = true;
+          m_videoRenderer->deleteObserver(this);
+          break;
+        }
+        m_videoRenderer->start(m_secondaryGlobalState);
+        std::cout << "VideoRenderer started." << std::endl;
       }
     }
     break;
@@ -92,6 +101,7 @@ void VideoController::start(std::vector<std::string_view>& filenames)
   m_primaryGlobalState->setup(m_movFileVec.at(0));
   m_videoReader->start(m_primaryGlobalState);
   m_videoDecoder->start(m_primaryGlobalState);
+  m_videoRenderer->start(m_primaryGlobalState);
 }
 
 
