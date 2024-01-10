@@ -110,6 +110,20 @@ int GlobalState::setup(std::string_view filename)
     return -1;
   }
 
+  // return with error in case no audio stream was found
+  if (m_vs->audioStreamIndex == -1)
+  {
+    std::cerr << "Could not open audio stream" << std::endl;
+    return -1;
+  }
+
+  ret = this->setupComponent(m_vs->audioStreamIndex);
+  if (ret < 0)
+  {
+    std::cerr << "Could not setup audio component." << std::endl;
+    return -1;
+  }
+
   return 0;
 }
 
@@ -203,6 +217,13 @@ int GlobalState::setupComponent(const int& streamIndex)
 
   switch (codecCtx->codec_type)
   {
+    case AVMEDIA_TYPE_AUDIO:
+    {
+      m_vs->audioCodecCtx = std::move(codecCtx);
+      m_vs->audioStream = m_vs->inputFmtCtx->streams[streamIndex];
+    }
+    break;
+
     case AVMEDIA_TYPE_VIDEO:
     {
       m_vs->videoCodecCtx = std::move(codecCtx);
