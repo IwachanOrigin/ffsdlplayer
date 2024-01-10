@@ -97,10 +97,18 @@ void VideoController::update(Subject* subject)
 
 void VideoController::start(std::vector<std::string_view>& filenames)
 {
+  std::chrono::milliseconds ms(20);
+
   m_movFileVec = filenames;
   m_primaryGlobalState->setup(m_movFileVec.at(0));
+  std::this_thread::sleep_for(ms);
+
   m_videoReader->start(m_primaryGlobalState);
+  std::this_thread::sleep_for(ms);
+
   m_videoDecoder->start(m_primaryGlobalState);
+  std::this_thread::sleep_for(ms);
+
   m_videoRenderer->start(m_primaryGlobalState);
 }
 

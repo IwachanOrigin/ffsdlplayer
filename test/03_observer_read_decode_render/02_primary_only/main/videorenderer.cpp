@@ -21,6 +21,7 @@ using namespace player;
 VideoRenderer::VideoRenderer()
   : Subject()
 {
+  this->setSubjectType(SubjectType::Renderer);
   m_mutex = SDL_CreateMutex();
 }
 
@@ -166,6 +167,7 @@ int VideoRenderer::displayThread()
       }
       break;
     }
+    this->scheduleRefresh(1);
   }
 
   if (m_texture)
@@ -210,14 +212,9 @@ void VideoRenderer::videoRefreshTimer()
   }
 
   // Check the videopicture queue contains decoded frames
-  if (m_gs->sizeVideoFrameDecoded() == 0)
+  if (m_gs->sizeVideoFrameDecoded() == 0 && m_gs->sizeAudioFrameDecoded() == 0)
   {
-    if (m_isRendererFinished)
-    {
-      this->notifyObservers();
-      return;
-    }
-    this->scheduleRefresh(1);
+    this->notifyObservers();
     return;
   }
 
