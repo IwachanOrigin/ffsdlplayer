@@ -26,6 +26,7 @@ int VideoDecoder::start(std::shared_ptr<GlobalState> vs)
     return -1;
   }
 
+  m_finishedDecoder = false;
   std::thread([&](VideoDecoder *decoder)
   {
     decoder->decodeThread(m_gs);

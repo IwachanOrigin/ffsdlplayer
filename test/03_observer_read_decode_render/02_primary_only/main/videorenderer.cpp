@@ -62,6 +62,7 @@ int VideoRenderer::start(std::shared_ptr<GlobalState> gs)
   {
     return -1;
   }
+  m_isRendererFinished = false;
 
   std::thread([&](VideoRenderer *vr)
   {
@@ -169,7 +170,7 @@ int VideoRenderer::displayThread()
     }
     this->scheduleRefresh(1);
   }
-
+#if 0
   if (m_texture)
   {
     SDL_DestroyTexture(m_texture);
@@ -187,7 +188,7 @@ int VideoRenderer::displayThread()
     SDL_DestroyWindow(m_screen);
     m_screen = nullptr;
   }
-
+#endif
   return 0;
 }
 

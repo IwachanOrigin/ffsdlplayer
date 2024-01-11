@@ -37,7 +37,10 @@ private:
   std::atomic_bool m_isVideoDecoderFinished = false;
 
   std::vector<std::string_view> m_movFileVec;
-  int m_finishedFileCount = 0;
+  int m_startedReadFileCount = 0;
+  int m_startedDecodeFileCount = 0;
+  int m_startedRenderFileCount = 0;
+
 };
 
 } // player

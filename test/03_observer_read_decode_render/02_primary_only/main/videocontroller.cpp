@@ -36,10 +36,24 @@ void VideoController::update(Subject* subject)
       {
         m_videoReader->deleteObserver(this);
         m_isVideoReaderFinished = true;
+        m_startedReadFileCount++;
         std::cout << "VideoReader finished." << std::endl;
 
-        // Setup Next file
+        // Check all files finished.
+        if (m_startedReadFileCount >= m_movFileVec.size())
+        {
+          m_videoReader->stop();
+          break;
+        }
+        // Setup Next file and reader
+        std::chrono::milliseconds ms(20);
         m_secondaryGlobalState->setup(m_movFileVec.at(1));
+        std::this_thread::sleep_for(ms);
+
+        m_isVideoReaderFinished = false;
+        m_videoReader->addObserver(this);
+        m_videoReader->start(m_secondaryGlobalState);
+        std::cout << "VideoReader started." << std::endl;
       }
     }
     break;
@@ -49,17 +63,18 @@ void VideoController::update(Subject* subject)
       auto videoDecoder = static_cast<VideoDecoder*>(subject);
       if (videoDecoder)
       {
-        if (m_isVideoReaderFinished)
+        if (m_startedReadFileCount > m_startedDecodeFileCount)
         {
           m_videoDecoder->stop();
           m_videoDecoder->deleteObserver(this);
+          m_startedDecodeFileCount++;
           std::cout << "VideoDecoder finished." << std::endl;
 
-          // Setup next reader, decoder
-          m_isVideoReaderFinished = false;
-          m_videoReader->addObserver(this);
-          m_videoReader->start(m_secondaryGlobalState);
-          std::cout << "VideoReader started." << std::endl;
+          if (m_startedDecodeFileCount >= m_movFileVec.size())
+          {
+            break;
+          }
+          // Setup next decoder
           m_videoDecoder->addObserver(this);
           m_videoDecoder->start(m_secondaryGlobalState);
           std::cout << "VideoDecoder started." << std::endl;
@@ -74,11 +89,12 @@ void VideoController::update(Subject* subject)
       if (videoRenderer)
       {
         std::cout << "VideoRenderer finished." << std::endl;
-        m_finishedFileCount++;
-        if (m_finishedFileCount >= m_movFileVec.size())
+        m_startedRenderFileCount++;
+        if (m_startedRenderFileCount >= m_movFileVec.size())
         {
-          m_isFinished = true;
+          m_videoRenderer->stop();
           m_videoRenderer->deleteObserver(this);
+          m_isFinished = true;
           break;
         }
         m_videoRenderer->start(m_secondaryGlobalState);

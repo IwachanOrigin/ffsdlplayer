@@ -29,6 +29,7 @@ int VideoReader::start(std::shared_ptr<GlobalState> gs)
     return -1;
   }
 
+  m_isFinished = false;
   // start read thread
   std::thread([&](VideoReader *reader)
   {
