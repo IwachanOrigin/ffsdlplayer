@@ -28,13 +28,16 @@ public:
 private:
   std::shared_ptr<GlobalState> m_primaryGlobalState = nullptr;
   std::shared_ptr<GlobalState> m_secondaryGlobalState = nullptr;
-  std::unique_ptr<VideoReader> m_videoReader = nullptr;
-  std::unique_ptr<VideoDecoder> m_videoDecoder = nullptr;
-  std::unique_ptr<VideoRenderer> m_videoRenderer = nullptr;
+  std::unique_ptr<VideoReader> m_primaryVideoReader = nullptr;
+  std::unique_ptr<VideoReader> m_secondaryVideoReader = nullptr;
+
+  std::unique_ptr<VideoDecoder> m_primaryVideoDecoder = nullptr;
+  std::unique_ptr<VideoDecoder> m_secondaryVideoDecoder = nullptr;
+
+  std::unique_ptr<VideoRenderer> m_primaryVideoRenderer = nullptr;
+  std::unique_ptr<VideoRenderer> m_secondaryVideoRenderer = nullptr;
 
   std::atomic_bool m_isFinished = false;
-  std::atomic_bool m_isVideoReaderFinished = false;
-  std::atomic_bool m_isVideoDecoderFinished = false;
 
   std::vector<std::string_view> m_movFileVec;
   int m_startedReadFileCount = 0;
