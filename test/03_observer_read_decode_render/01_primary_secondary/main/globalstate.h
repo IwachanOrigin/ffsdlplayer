@@ -163,6 +163,8 @@ private:
   int setupComponent(const int& streamIndex);
   double calcVideoClock();
   double calcExternalClock();
+  void init();
+  void clear();
 };
 
 } // player

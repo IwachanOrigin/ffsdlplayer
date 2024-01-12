@@ -6,58 +6,26 @@ using namespace player;
 
 GlobalState::GlobalState()
 {
-  m_vs = std::make_unique<VideoState>();
-  // For reader
-  m_vs->audioPacketQueueRead.init();
-  m_vs->videoPacketQueueRead.init();
-  m_vs->flushPkt = av_packet_alloc();
-  m_vs->flushPkt->data = (uint8_t*)"FLUSH";
   // For clock
   m_clockSyncType = SYNC_TYPE::AV_SYNC_AUDIO_MASTER;
 }
 
 GlobalState::~GlobalState()
 {
-  // For reader
-  m_vs->audioPacketQueueRead.clear();
-  m_vs->videoPacketQueueRead.clear();
-
-  if (m_vs->audioCodecCtx)
-  {
-    avcodec_close(m_vs->audioCodecCtx);
-    avcodec_free_context(&m_vs->audioCodecCtx);
-    m_vs->audioCodecCtx = nullptr;
-  }
-
-  if (m_vs->videoCodecCtx)
-  {
-    avcodec_close(m_vs->videoCodecCtx);
-    avcodec_free_context(&m_vs->videoCodecCtx);
-    m_vs->videoCodecCtx = nullptr;
-  }
-
-  if (m_vs->decodeVideoSwsCtx)
-  {
-    sws_freeContext(m_vs->decodeVideoSwsCtx);
-    m_vs->decodeVideoSwsCtx = nullptr;
-  }
-
-  if (m_vs->inputFmtCtx)
-  {
-    avformat_close_input(&m_vs->inputFmtCtx);
-    avformat_free_context(m_vs->inputFmtCtx);
-    m_vs->inputFmtCtx = nullptr;
-  }
-
-  if (m_vs->flushPkt)
-  {
-    av_packet_unref(m_vs->flushPkt);
-    m_vs->flushPkt = nullptr;
-  }
+  this->clear();
 }
 
 int GlobalState::setup(std::string_view filename)
 {
+  if (m_vs)
+  {
+    // Reset
+    this->clear();
+  }
+
+  // Init
+  this->init();
+
   auto ret = avformat_open_input(&m_vs->inputFmtCtx, filename.data(), nullptr, nullptr);
   if (ret < 0)
   {
@@ -306,3 +274,54 @@ void GlobalState::streamSeek(const int64_t& pos, const int& rel)
   }
 }
 
+void GlobalState::init()
+{
+  m_vs = std::make_unique<VideoState>();
+  // For reader
+  m_vs->audioPacketQueueRead.init();
+  m_vs->videoPacketQueueRead.init();
+  m_vs->flushPkt = av_packet_alloc();
+  m_vs->flushPkt->data = (uint8_t*)"FLUSH";
+}
+
+void GlobalState::clear()
+{
+  // For reader
+  m_vs->audioPacketQueueRead.clear();
+  m_vs->videoPacketQueueRead.clear();
+
+  if (m_vs->audioCodecCtx)
+  {
+    avcodec_close(m_vs->audioCodecCtx);
+    avcodec_free_context(&m_vs->audioCodecCtx);
+    m_vs->audioCodecCtx = nullptr;
+  }
+
+  if (m_vs->videoCodecCtx)
+  {
+    avcodec_close(m_vs->videoCodecCtx);
+    avcodec_free_context(&m_vs->videoCodecCtx);
+    m_vs->videoCodecCtx = nullptr;
+  }
+
+  if (m_vs->decodeVideoSwsCtx)
+  {
+    sws_freeContext(m_vs->decodeVideoSwsCtx);
+    m_vs->decodeVideoSwsCtx = nullptr;
+  }
+
+  if (m_vs->inputFmtCtx)
+  {
+    avformat_close_input(&m_vs->inputFmtCtx);
+    avformat_free_context(m_vs->inputFmtCtx);
+    m_vs->inputFmtCtx = nullptr;
+  }
+
+  if (m_vs->flushPkt)
+  {
+    av_packet_unref(m_vs->flushPkt);
+    m_vs->flushPkt = nullptr;
+  }
+
+  m_vs.reset();
+}

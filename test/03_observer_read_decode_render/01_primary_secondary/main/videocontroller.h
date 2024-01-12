@@ -19,7 +19,7 @@ public:
   explicit VideoController();
   virtual ~VideoController();
 
-  void start(std::vector<std::string_view>& filenames);
+  void start(std::vector<std::string>& filenames);
   bool isFinished() const { return m_isFinished; }
 
   // From Observer class
@@ -40,7 +40,7 @@ private:
 
   std::atomic_bool m_isFinished = false;
 
-  std::vector<std::string_view> m_movFileVec;
+  std::vector<std::string> m_movFileVec;
   int m_startedReadFileCount = 0;
   int m_startedDecodeFileCount = 0;
   int m_startedRenderFileCount = 0;

@@ -54,6 +54,14 @@ void VideoController::update(Subject* subject)
             m_secondaryVideoReader->stop();
             m_secondaryVideoReader.reset();
           }
+          if (m_primaryGlobalState)
+          {
+            m_primaryGlobalState.reset();
+          }
+          if (m_secondaryGlobalState)
+          {
+            m_secondaryGlobalState.reset();
+          }
           std::cout << "All VideoReader finished." << std::endl;
           break;
         }
@@ -205,6 +213,8 @@ void VideoController::update(Subject* subject)
             m_primaryVideoRenderer->deleteObserver(this);
             m_primaryVideoRenderer->stop();
             m_primaryVideoRenderer.reset();
+            m_primaryGlobalState.reset();
+            m_primaryGlobalState = std::make_shared<GlobalState>();
             std::cout << "Primary VideoRenderer finished." << std::endl;
 
             // Setup next renderer
@@ -221,6 +231,8 @@ void VideoController::update(Subject* subject)
             m_secondaryVideoRenderer->deleteObserver(this);
             m_secondaryVideoRenderer->stop();
             m_secondaryVideoRenderer.reset();
+            m_secondaryGlobalState.reset();
+            m_secondaryGlobalState = std::make_shared<GlobalState>();
             std::cout << "Secondary VideoRenderer finished." << std::endl;
 
             // Setup next renderer
@@ -244,9 +256,9 @@ void VideoController::update(Subject* subject)
   }
 }
 
-void VideoController::start(std::vector<std::string_view>& filenames)
+void VideoController::start(std::vector<std::string>& filenames)
 {
-  std::chrono::milliseconds ms(50);
+  std::chrono::milliseconds ms(100);
 
   m_movFileVec = filenames;
   m_primaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
