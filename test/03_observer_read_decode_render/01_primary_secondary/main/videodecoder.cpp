@@ -83,10 +83,6 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
     // check audio and video packets queues size
     if (globalState->sizeAudioFrameDecoded() + globalState->sizeVideoFrameDecoded() > MAX_QUEUE_SIZE)
     {
-      // !!!!!!! DELETE !!!!!!!!
-      globalState->clearAudioFrameDecoded();
-      globalState->clearVideoFrameDecoded();
-
       // wait for audio and video queues to decrease size
       std::this_thread::sleep_for(delayms);
       continue;
@@ -160,10 +156,6 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
     // wipe the packet
     av_packet_unref(packet);
   }
-
-  // !!!!!!! DELETE !!!!!!!!
-  globalState->clearAudioFrameDecoded();
-  globalState->clearVideoFrameDecoded();
 
   // wipe the frame
   av_frame_free(&pFrame);

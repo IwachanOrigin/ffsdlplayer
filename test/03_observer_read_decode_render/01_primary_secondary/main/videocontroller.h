@@ -6,6 +6,7 @@
 #include "globalstate.h"
 #include "videoreader.h"
 #include "videodecoder.h"
+#include "videorenderer.h"
 
 #include <atomic>
 
@@ -27,20 +28,23 @@ public:
 private:
   // Primary
   std::shared_ptr<GlobalState> m_primaryGlobalState = nullptr;
-  std::unique_ptr<VideoReader> m_primaryVideoReader = nullptr;
-  std::unique_ptr<VideoDecoder> m_primaryVideoDecoder = nullptr;
-
-  // Secondary
   std::shared_ptr<GlobalState> m_secondaryGlobalState = nullptr;
+  std::unique_ptr<VideoReader> m_primaryVideoReader = nullptr;
   std::unique_ptr<VideoReader> m_secondaryVideoReader = nullptr;
+
+  std::unique_ptr<VideoDecoder> m_primaryVideoDecoder = nullptr;
   std::unique_ptr<VideoDecoder> m_secondaryVideoDecoder = nullptr;
 
+  std::unique_ptr<VideoRenderer> m_primaryVideoRenderer = nullptr;
+  std::unique_ptr<VideoRenderer> m_secondaryVideoRenderer = nullptr;
+
   std::atomic_bool m_isFinished = false;
-  std::atomic_bool m_isPrimaryVideoReaderFinished = false;
-  std::atomic_bool m_isSecondaryVideoReaderFinished = false;
-  std::atomic_bool m_isVideoDecoderFinished = false;
 
   std::vector<std::string_view> m_movFileVec;
+  int m_startedReadFileCount = 0;
+  int m_startedDecodeFileCount = 0;
+  int m_startedRenderFileCount = 0;
+
 };
 
 } // player

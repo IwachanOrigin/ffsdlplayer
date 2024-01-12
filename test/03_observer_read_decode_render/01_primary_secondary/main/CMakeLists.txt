@@ -18,6 +18,8 @@ set(main_src
   videodecoder.h
   videoreader.cpp
   videoreader.h
+  videorenderer.cpp
+  videorenderer.h
 )
 
 add_executable(

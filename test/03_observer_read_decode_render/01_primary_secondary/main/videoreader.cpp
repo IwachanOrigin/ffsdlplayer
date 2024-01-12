@@ -83,12 +83,6 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
     {
       if (ret == AVERROR_EOF)
       {
-        // wait for the rest of the program to end
-        while (globalState->nbPacketsAudioRead() > 0 && globalState->nbPacketsVideoRead() > 0)
-        {
-          std::this_thread::sleep_for(delayms);
-        }
-
         // media EOF reached, quit
         break;
       }
