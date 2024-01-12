@@ -193,6 +193,7 @@ void VideoController::update(Subject* subject)
             m_secondaryVideoRenderer.reset();
           }
           std::cout << "All VideoDecoder finished." << std::endl;
+          m_isFinished = true;
           break;
         }
 
@@ -245,10 +246,19 @@ void VideoController::update(Subject* subject)
 
 void VideoController::start(std::vector<std::string_view>& filenames)
 {
+  std::chrono::milliseconds ms(50);
+
   m_movFileVec = filenames;
   m_primaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
+  std::this_thread::sleep_for(ms);
+
   m_primaryVideoReader->start(m_primaryGlobalState);
+  std::this_thread::sleep_for(ms);
+
   m_primaryVideoDecoder->start(m_primaryGlobalState);
+  std::this_thread::sleep_for(ms);
+
+  m_primaryVideoRenderer->start(m_primaryGlobalState);
 }
 
 
