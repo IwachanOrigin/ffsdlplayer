@@ -16,6 +16,18 @@ int main(int argc, char* argv[])
     return -1;
   }
 
+  // Set locale(use to the system default locale)
+  std::wcout.imbue(std::locale(""));
+
+  // init SDL
+  int ret = -1;
+  ret = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER);
+  if (ret != 0)
+  {
+    std::cerr << "Could not initialize SDL" << SDL_GetError() << std::endl;
+    return -1;
+  }
+
   std::vector<std::string_view> movieFileVec;
   movieFileVec.push_back(argv[1]);
   movieFileVec.push_back(argv[2]);
@@ -26,6 +38,11 @@ int main(int argc, char* argv[])
   {
     std::this_thread::sleep_for(ms);
   }
+
+  // Release
+  SDL_VideoQuit();
+  SDL_AudioQuit();
+  SDL_Quit();
 
   return 0;
 }

@@ -172,7 +172,66 @@ void VideoController::update(Subject* subject)
 
     case Renderer:
     {
-      //
+      auto renderer = static_cast<VideoRenderer*>(subject);
+      if (renderer)
+      {
+        m_startedRenderFileCount++;
+
+        // Check all files finished.
+        if (m_startedRenderFileCount >= m_movFileVec.size())
+        {
+          if (m_primaryVideoRenderer)
+          {
+            m_primaryVideoRenderer->deleteObserver(this);
+            m_primaryVideoRenderer->stop();
+            m_primaryVideoRenderer.reset();
+          }
+          if (m_secondaryVideoRenderer)
+          {
+            m_secondaryVideoRenderer->deleteObserver(this);
+            m_secondaryVideoRenderer->stop();
+            m_secondaryVideoRenderer.reset();
+          }
+          std::cout << "All VideoDecoder finished." << std::endl;
+          break;
+        }
+
+        switch (renderer->subjectMode())
+        {
+          using enum player::SubjectMode;
+          case Primary:
+          {
+            m_primaryVideoRenderer->deleteObserver(this);
+            m_primaryVideoRenderer->stop();
+            m_primaryVideoRenderer.reset();
+            std::cout << "Primary VideoRenderer finished." << std::endl;
+
+            // Setup next renderer
+            m_secondaryVideoRenderer = std::make_unique<VideoRenderer>();
+            m_secondaryVideoRenderer->setSubjectMode(player::SubjectMode::Secondary);
+            m_secondaryVideoRenderer->addObserver(this);
+            m_secondaryVideoRenderer->start(m_secondaryGlobalState);
+            std::cout << "Secondary VideoRenderer started." << std::endl;
+          }
+          break;
+
+          case Secondary:
+          {
+            m_secondaryVideoRenderer->deleteObserver(this);
+            m_secondaryVideoRenderer->stop();
+            m_secondaryVideoRenderer.reset();
+            std::cout << "Secondary VideoRenderer finished." << std::endl;
+
+            // Setup next renderer
+            m_primaryVideoRenderer = std::make_unique<VideoRenderer>();
+            m_primaryVideoRenderer->setSubjectMode(player::SubjectMode::Primary);
+            m_primaryVideoRenderer->addObserver(this);
+            m_primaryVideoRenderer->start(m_primaryGlobalState);
+            std::cout << "Primary VideoRenderer started." << std::endl;
+          }
+          break;
+        }
+      }
     }
     break;
 
