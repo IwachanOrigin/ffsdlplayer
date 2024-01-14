@@ -8,7 +8,6 @@ VideoController::VideoController()
   : Observer()
 {
   // Primary
-  m_primaryGlobalState = std::make_shared<GlobalState>();
   m_primaryVideoReader = std::make_unique<VideoReader>();
   m_primaryVideoReader->addObserver(this);
   m_primaryVideoReader->setSubjectMode(player::SubjectMode::Primary);
@@ -18,9 +17,6 @@ VideoController::VideoController()
   m_primaryVideoRenderer = std::make_unique<VideoRenderer>();
   m_primaryVideoRenderer->addObserver(this);
   m_primaryVideoRenderer->setSubjectMode(player::SubjectMode::Primary);
-
-  // Secondary
-  m_secondaryGlobalState = std::make_shared<GlobalState>();
 }
 
 VideoController::~VideoController()
@@ -54,13 +50,12 @@ void VideoController::update(Subject* subject)
             m_secondaryVideoReader->stop();
             m_secondaryVideoReader.reset();
           }
-          if (m_primaryGlobalState)
+          for (auto gs : m_vecGlobalState)
           {
-            m_primaryGlobalState.reset();
-          }
-          if (m_secondaryGlobalState)
-          {
-            m_secondaryGlobalState.reset();
+            if (gs)
+            {
+              gs.reset();
+            }
           }
           std::cout << "All VideoReader finished." << std::endl;
           break;
@@ -78,13 +73,15 @@ void VideoController::update(Subject* subject)
 
             // Setup next file and reader
             std::chrono::milliseconds ms(20);
-            m_secondaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
+            m_vecGlobalState.push_back(std::make_shared<GlobalState>());
+            auto& gs = m_vecGlobalState.at(m_startedReadFileCount);
+            gs->setup(m_movFileVec.at(m_startedReadFileCount));
             std::this_thread::sleep_for(ms);
 
             m_secondaryVideoReader = std::make_unique<VideoReader>();
             m_secondaryVideoReader->setSubjectMode(player::SubjectMode::Secondary);
             m_secondaryVideoReader->addObserver(this);
-            m_secondaryVideoReader->start(m_secondaryGlobalState);
+            m_secondaryVideoReader->start(gs);
             std::cout << "Secondary VideoReader started." << std::endl;
           }
           break;
@@ -98,13 +95,16 @@ void VideoController::update(Subject* subject)
 
             // Setup next file and reader
             std::chrono::milliseconds ms(20);
-            m_primaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
+            m_vecGlobalState.push_back(std::make_shared<GlobalState>());
+            auto& gs = m_vecGlobalState.at(m_startedReadFileCount);
+            gs->setup(m_movFileVec.at(m_startedReadFileCount));
+            gs->setup(m_movFileVec.at(m_startedReadFileCount));
             std::this_thread::sleep_for(ms);
 
             m_primaryVideoReader = std::make_unique<VideoReader>();
             m_primaryVideoReader->setSubjectMode(player::SubjectMode::Primary);
             m_primaryVideoReader->addObserver(this);
-            m_primaryVideoReader->start(m_secondaryGlobalState);
+            m_primaryVideoReader->start(gs);
             std::cout << "Primary VideoReader started." << std::endl;
           }
           break;
@@ -153,7 +153,8 @@ void VideoController::update(Subject* subject)
             m_secondaryVideoDecoder = std::make_unique<VideoDecoder>();
             m_secondaryVideoDecoder->setSubjectMode(player::SubjectMode::Secondary);
             m_secondaryVideoDecoder->addObserver(this);
-            m_secondaryVideoDecoder->start(m_secondaryGlobalState);
+            auto& gs = m_vecGlobalState.at(m_startedDecodeFileCount);
+            m_secondaryVideoDecoder->start(gs);
             std::cout << "Secondary VideoDecoder started." << std::endl;
           }
           break;
@@ -169,7 +170,8 @@ void VideoController::update(Subject* subject)
             m_primaryVideoDecoder = std::make_unique<VideoDecoder>();
             m_primaryVideoDecoder->setSubjectMode(player::SubjectMode::Primary);
             m_primaryVideoDecoder->addObserver(this);
-            m_primaryVideoDecoder->start(m_primaryGlobalState);
+            auto& gs = m_vecGlobalState.at(m_startedDecodeFileCount);
+            m_primaryVideoDecoder->start(gs);
             std::cout << "Primary VideoDecoder started." << std::endl;
           }
           break;
@@ -213,15 +215,14 @@ void VideoController::update(Subject* subject)
             m_primaryVideoRenderer->deleteObserver(this);
             m_primaryVideoRenderer->stop();
             m_primaryVideoRenderer.reset();
-            m_primaryGlobalState.reset();
-            m_primaryGlobalState = std::make_shared<GlobalState>();
             std::cout << "Primary VideoRenderer finished." << std::endl;
 
             // Setup next renderer
             m_secondaryVideoRenderer = std::make_unique<VideoRenderer>();
             m_secondaryVideoRenderer->setSubjectMode(player::SubjectMode::Secondary);
             m_secondaryVideoRenderer->addObserver(this);
-            m_secondaryVideoRenderer->start(m_secondaryGlobalState);
+            auto& gs = m_vecGlobalState.at(m_startedRenderFileCount);
+            m_secondaryVideoRenderer->start(gs);
             std::cout << "Secondary VideoRenderer started." << std::endl;
           }
           break;
@@ -231,15 +232,14 @@ void VideoController::update(Subject* subject)
             m_secondaryVideoRenderer->deleteObserver(this);
             m_secondaryVideoRenderer->stop();
             m_secondaryVideoRenderer.reset();
-            m_secondaryGlobalState.reset();
-            m_secondaryGlobalState = std::make_shared<GlobalState>();
             std::cout << "Secondary VideoRenderer finished." << std::endl;
 
             // Setup next renderer
             m_primaryVideoRenderer = std::make_unique<VideoRenderer>();
             m_primaryVideoRenderer->setSubjectMode(player::SubjectMode::Primary);
             m_primaryVideoRenderer->addObserver(this);
-            m_primaryVideoRenderer->start(m_primaryGlobalState);
+            auto& gs = m_vecGlobalState.at(m_startedDecodeFileCount);
+            m_primaryVideoRenderer->start(gs);
             std::cout << "Primary VideoRenderer started." << std::endl;
           }
           break;
@@ -261,16 +261,18 @@ void VideoController::start(std::vector<std::string>& filenames)
   std::chrono::milliseconds ms(100);
 
   m_movFileVec = filenames;
-  m_primaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
+  m_vecGlobalState.push_back(std::make_shared<GlobalState>());
+  auto& gs = m_vecGlobalState.at(m_startedReadFileCount);
+  gs->setup(m_movFileVec.at(m_startedReadFileCount));
   std::this_thread::sleep_for(ms);
 
-  m_primaryVideoReader->start(m_primaryGlobalState);
+  m_primaryVideoReader->start(gs);
   std::this_thread::sleep_for(ms);
 
-  m_primaryVideoDecoder->start(m_primaryGlobalState);
+  m_primaryVideoDecoder->start(gs);
   std::this_thread::sleep_for(ms);
 
-  m_primaryVideoRenderer->start(m_primaryGlobalState);
+  m_primaryVideoRenderer->start(gs);
 }
 
 

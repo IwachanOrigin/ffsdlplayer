@@ -161,6 +161,8 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
   av_frame_free(&pFrame);
   av_free(pFrame);
 
+  globalState.reset();
+
   return 0;
 }
 

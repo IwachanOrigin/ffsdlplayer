@@ -118,6 +118,8 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
   // Notify
   this->notifyObservers();
 
+  globalState.reset();
+
   return 0;
 }
 

@@ -26,9 +26,7 @@ public:
   virtual void update(Subject* subject);
 
 private:
-  // Primary
-  std::shared_ptr<GlobalState> m_primaryGlobalState = nullptr;
-  std::shared_ptr<GlobalState> m_secondaryGlobalState = nullptr;
+  std::vector<std::shared_ptr<GlobalState>> m_vecGlobalState;
   std::unique_ptr<VideoReader> m_primaryVideoReader = nullptr;
   std::unique_ptr<VideoReader> m_secondaryVideoReader = nullptr;
 
@@ -44,7 +42,6 @@ private:
   int m_startedReadFileCount = 0;
   int m_startedDecodeFileCount = 0;
   int m_startedRenderFileCount = 0;
-
 };
 
 } // player
