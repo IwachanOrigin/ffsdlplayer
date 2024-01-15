@@ -100,6 +100,10 @@ int VideoRenderer::displayThread()
     if (ret == 0)
     {
       //std::cerr << "SDL_WaitEvent failed : " << SDL_GetError() << std::endl;
+      this->scheduleRefresh(10);
+      std::chrono::milliseconds ms(10);
+      std::this_thread::sleep_for(ms);
+      continue;
     }
 
     // switch on the retrieved event type
@@ -147,12 +151,6 @@ int VideoRenderer::displayThread()
             }
             break;
           }
-
-          default:
-          {
-            this->scheduleRefresh(1);
-          }
-          break;
         }
       }
       break;
@@ -169,33 +167,9 @@ int VideoRenderer::displayThread()
         this->videoRefreshTimer();
       }
       break;
-
-      default:
-      {
-        this->scheduleRefresh(1);
-      }
-      break;
-    }    
+    }
+   
   }
-#if 0
-  if (m_texture)
-  {
-    SDL_DestroyTexture(m_texture);
-    m_texture = nullptr;
-  }
-
-  if (m_renderer)
-  {
-    SDL_DestroyRenderer(m_renderer);
-    m_renderer = nullptr;
-  }
-
-  if (m_screen)
-  {
-    SDL_DestroyWindow(m_screen);
-    m_screen = nullptr;
-  }
-#endif
   return 0;
 }
 
@@ -220,9 +194,15 @@ void VideoRenderer::videoRefreshTimer()
   }
 
   // Check the videopicture queue contains decoded frames
-  if (m_gs->sizeVideoFrameDecoded() == 0 && m_gs->sizeAudioFrameDecoded() == 0)
+  if (m_gs->sizeVideoFrameDecoded() == 0)
   {
-    this->notifyObservers();
+    if (m_gs->sizeVideoPacketRead() == 0)
+    {
+      this->notifyObservers();
+      return;
+    }
+    
+    this->scheduleRefresh(1);
     return;
   }
 
