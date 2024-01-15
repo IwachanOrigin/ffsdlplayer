@@ -87,6 +87,8 @@ public:
 
   // Init
   int setup(std::string_view filename);
+  // Reset
+  void clear();
 
   // Common
   AVFormatContext*& inputFmtCtx() const { return m_vs->inputFmtCtx; }
@@ -164,7 +166,6 @@ private:
   double calcVideoClock();
   double calcExternalClock();
   void init();
-  void clear();
 };
 
 } // player

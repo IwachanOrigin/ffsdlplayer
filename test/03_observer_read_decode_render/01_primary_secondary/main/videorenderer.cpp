@@ -53,6 +53,7 @@ VideoRenderer::~VideoRenderer()
     m_screen = nullptr;
   }
 
+  m_gs.reset();
 }
 
 int VideoRenderer::start(std::shared_ptr<GlobalState> gs)
@@ -94,10 +95,11 @@ int VideoRenderer::displayThread()
 
     double incr = 0, pos = 0;
     // wait indefinitely for the next available event
-    ret = SDL_WaitEvent(&event);
+    //ret = SDL_WaitEvent(&event);
+    ret = SDL_PollEvent(&event);
     if (ret == 0)
     {
-      std::cerr << "SDL_WaitEvent failed : " << SDL_GetError() << std::endl;
+      //std::cerr << "SDL_WaitEvent failed : " << SDL_GetError() << std::endl;
     }
 
     // switch on the retrieved event type
@@ -148,7 +150,7 @@ int VideoRenderer::displayThread()
 
           default:
           {
-            // nothing
+            this->scheduleRefresh(1);
           }
           break;
         }
@@ -167,8 +169,13 @@ int VideoRenderer::displayThread()
         this->videoRefreshTimer();
       }
       break;
-    }
-    this->scheduleRefresh(1);
+
+      default:
+      {
+        this->scheduleRefresh(1);
+      }
+      break;
+    }    
   }
 #if 0
   if (m_texture)

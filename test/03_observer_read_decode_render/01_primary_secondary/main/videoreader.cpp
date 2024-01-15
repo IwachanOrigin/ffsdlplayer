@@ -19,6 +19,7 @@ VideoReader::VideoReader()
 VideoReader::~VideoReader()
 {
   this->stop();
+  m_gs.reset();
 }
 
 int VideoReader::start(std::shared_ptr<GlobalState> gs)
@@ -48,7 +49,7 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
   int ret = -1;
 
   // retrieve global VideoState reference
-  auto globalState = gs;
+  auto& globalState = gs;
 
   // Set the AVFormatContext for the global videostate ref
   auto& formatCtx = globalState->inputFmtCtx();
@@ -117,8 +118,6 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
 
   // Notify
   this->notifyObservers();
-
-  globalState.reset();
 
   return 0;
 }
