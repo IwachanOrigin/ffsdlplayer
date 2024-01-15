@@ -1,68 +1,41 @@
 
-#include <memory>
+#include "videocontroller.h"
 #include <iostream>
 #include <chrono>
 #include <thread>
-#include <vector>
-#include <string>
-#include <cstdlib>
+#include <filesystem>
 
-#include "videoreader.h"
-#include "stringhelper.h"
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
-#pragma comment(lib, "avcodec")
-#pragma comment(lib, "avdevice")
-#pragma comment(lib, "avfilter")
-#pragma comment(lib, "avformat")
-#pragma comment(lib, "avutil")
-#pragma comment(lib, "swresample")
-#pragma comment(lib, "swscale")
-#pragma comment(lib, "SDL2")
+namespace fs = std::filesystem;
+using namespace player;
 
 #undef main
 
-static inline int getOutputAudioDeviceList(std::vector<std::wstring> &vec)
+int main(int argc, char* argv[])
 {
-  int deviceNum = SDL_GetNumAudioDevices(0);
-  for (int i = 0; i < deviceNum; i++)
+  if (argc < 2)
   {
-    const char* audioDeviceName = SDL_GetAudioDeviceName(i, 0);
-    std::string mcAudioDeviceName = std::string(audioDeviceName);
-    std::wstring wcAudioDeviceName = stringHelper::stringToWstring(mcAudioDeviceName);
-    vec.push_back(wcAudioDeviceName);
+    std::cout << argv[0] << " <Movie file directory path>" << std::endl;
+    return -1;
   }
-  return deviceNum;
-}
 
-static inline void usage(const std::wstring& wsProgName)
-{
-  // Output command line parameter.
-  std::wcout << wsProgName
-             << " <file path / url>"
-             << " <output audio device index>"
-             << std::endl;
-  std::wcout << "i.e.," << std::endl;
-  std::wcout << wsProgName << " /path/to/movie.mp4 1" << std::endl << std::endl;
-
-  // Get audio output devices.
-  std::vector<std::wstring> vecAudioOutDevNames;
-  std::wcout << "----- Audio Output Devices -----" << std::endl;
-  getOutputAudioDeviceList(vecAudioOutDevNames);
-  if (vecAudioOutDevNames.empty())
-  {
-    std::wcerr << "Failed to get audio output devices." << std::endl;
-    return;
-  }
-  for (uint32_t i = 0; i < vecAudioOutDevNames.size(); i++)
-  {
-    std::wcout << "No. " << i << " : " << vecAudioOutDevNames[i] << std::endl;
-  }
-}
-
-int main(int argc, char *argv[])
-{
   // Set locale(use to the system default locale)
   std::wcout.imbue(std::locale(""));
+
+  if (!fs::exists(argv[1]))
+  {
+    std::cerr << argv[1] << " is not found." << std::endl;
+    return -1;
+  }
+
+  if (!fs::is_directory(argv[1]))
+  {
+    std::cerr << argv[1] << "is not directory." << std::endl;
+    return -1;
+  }
 
   // init SDL
   int ret = -1;
@@ -73,43 +46,38 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  std::string progName = std::string(argv[0]);
-  std::wstring wsProgName = stringHelper::stringToWstring(progName);
-  if (argc != 3)
+  std::vector<std::string> movieFileVec;
+#ifdef _WIN32
+  for (const auto& file : fs::directory_iterator(argv[1]))
   {
-    usage(wsProgName);
-    return -1;
-  }
-
-  std::vector<std::wstring> vecAudioOutDevNames;
-  int deviceNum = getOutputAudioDeviceList(vecAudioOutDevNames);
-  int outputAudioDevIndex = std::stoi(argv[2]);
-  if (deviceNum < outputAudioDevIndex)
-  {
-    std::cerr << "Failed to input audio output device number." << std::endl;
-    usage(wsProgName);
-    return -1;
-  }
-
-  std::unique_ptr<player::VideoReader> videoReader = std::make_unique<player::VideoReader>();
-  std::string filename = std::string(argv[1]);
-  videoReader->start(filename, outputAudioDevIndex);
-  while(1)
-  {
-    std::chrono::milliseconds duration(1000);
-    std::this_thread::sleep_for(duration);
-    if (videoReader->isFinished())
+    auto attrs = GetFileAttributes(file.path().wstring().data());
+    if ((attrs != INVALID_FILE_ATTRIBUTES) &&
+      !(attrs & FILE_ATTRIBUTE_HIDDEN))
     {
-      videoReader->stop();
-      break;
+      movieFileVec.push_back(file.path().string());
     }
   }
+#else
+  for (const auto& file : fs::directory_iterator(argv[1]))
+  {
+    if (file.path().filename().wstring().front() != '.')
+    {
+      movieFileVec.push_back(file.path().string());
+    }
+  }
+#endif
+  VideoController vc;
+  vc.start(movieFileVec);
+  std::chrono::milliseconds ms(100);
+  while(!vc.isFinished())
+  {
+    std::this_thread::sleep_for(ms);
+  }
 
-  //
+  // Release
   SDL_VideoQuit();
   SDL_AudioQuit();
   SDL_Quit();
 
-  std::wcout << "finished." << std::endl;
   return 0;
 }

@@ -1,23 +1,25 @@
 
 set(main_src
+  framequeue.cpp
+  framequeue.h
+  globalstate.cpp
+  globalstate.h
   main.cpp
-  packetqueue.h
-  packetqueue.cpp
-  audiodecoder.h
-  audiodecoder.cpp
-  audioresamplingstate.h
-  audioresamplingstate.cpp
-  videodecoder.h
-  videodecoder.cpp
-  videopicture.h
-  videoreader.h
-  videoreader.cpp
-  videostate.h
-  videostate.cpp
-  videorenderer.h
-  videorenderer.cpp
   myavpacketlist.h
+  observer.h
+  packetqueue.cpp
+  packetqueue.h
   stringhelper.h
+  subject.cpp
+  subject.h
+  videocontroller.cpp
+  videocontroller.h
+  videodecoder.cpp
+  videodecoder.h
+  videoreader.cpp
+  videoreader.h
+  videorenderer.cpp
+  videorenderer.h
 )
 
 add_executable(

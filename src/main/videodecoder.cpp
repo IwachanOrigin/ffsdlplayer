@@ -7,24 +7,31 @@ using namespace player;
 
 const int MAX_QUEUE_SIZE = 50;
 
+VideoDecoder::VideoDecoder()
+  : Subject()
+{
+  this->setSubjectType(SubjectType::Decoder);
+}
+
 VideoDecoder::~VideoDecoder()
 {
   this->stop();
+  m_gs.reset();
 }
 
-int VideoDecoder::start(std::shared_ptr<VideoState> vs)
+int VideoDecoder::start(std::shared_ptr<GlobalState> vs)
 {
-  m_vs = vs;
-  if (m_vs)
+  m_gs = vs;
+  if (!m_gs)
   {
-    std::thread([&](VideoDecoder *decoder)
-    {
-      decoder->decodeThread(m_vs);
-    }, this).detach();
-    return 0;
+    return -1;
   }
 
-  return -1;
+  std::thread([&](VideoDecoder *decoder)
+  {
+    decoder->decodeThread(m_gs);
+  }, this).detach();
+  return 0;
 }
 
 void VideoDecoder::stop()
@@ -33,10 +40,10 @@ void VideoDecoder::stop()
   m_finishedDecoder = true;
 }
 
-int VideoDecoder::decodeThread(std::shared_ptr<VideoState> vs)
+int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
 {
   // retrieve global videostate
-  auto videoState = vs;
+  auto& globalState = vs;
 
   // allocate an AVPacket to be used to retrieve data from the videoq.
   AVPacket* packet = av_packet_alloc();
@@ -59,9 +66,11 @@ int VideoDecoder::decodeThread(std::shared_ptr<VideoState> vs)
     return -1;
   }
 
+  // Init
+  std::chrono::milliseconds delayms(10);
   double pts = 0.0;
-  auto& videoCodecCtx = videoState->videoCodecCtx();
-  for (;;)
+  auto& videoCodecCtx = globalState->videoCodecCtx();
+  while (1)
   {
     // Check decoder finish flg
     {
@@ -72,19 +81,23 @@ int VideoDecoder::decodeThread(std::shared_ptr<VideoState> vs)
       }
     }
 
-    // get a packet from videq
-    int ret = videoState->popVideoPacketRead(packet);
-    if (ret < 0)
+    // check audio and video packets queues size
+    if (globalState->sizeAudioFrameDecoded() + globalState->sizeVideoFrameDecoded() > MAX_QUEUE_SIZE)
     {
-      if (videoState->isPlayerFinished())
-      {
-        // means we quit getting packets
-        break;
-      }
+      // wait for audio and video queues to decrease size
+      std::this_thread::sleep_for(delayms);
       continue;
     }
 
-    auto flushPacket = videoState->flushPacket();
+    // get a packet from videq
+    int ret = globalState->popVideoPacketRead(packet);
+    if (ret < 0)
+    {
+      this->notifyObservers();
+      continue;
+    }
+
+    auto flushPacket = globalState->flushPacket();
     if (flushPacket)
     {
       if (packet->data == flushPacket->data)
@@ -131,17 +144,14 @@ int VideoDecoder::decodeThread(std::shared_ptr<VideoState> vs)
         pts = 0.0;
       }
 
-      auto& videoStream = videoState->videoStream();
+      auto& videoStream = globalState->videoStream();
       pts *= av_q2d(videoStream->time_base);
 
       // did we get an entire video frame?
       if (frameFinished)
       {
-        pts = this->syncVideo(videoState, pFrame, pts);
-        if (videoState->queuePicture(pFrame, pts) < 0)
-        {
-          break;
-        }
+        pts = this->syncVideo(globalState, pFrame, pts);
+        globalState->pushVideoFrameDecoded(pFrame);
       }
     }
     // wipe the packet
@@ -154,7 +164,6 @@ int VideoDecoder::decodeThread(std::shared_ptr<VideoState> vs)
 
   return 0;
 }
-
 
 int64_t VideoDecoder::guessCorrectPts(AVCodecContext *ctx, const int64_t& reordered_pts, const int64_t& dts)
 {
@@ -192,30 +201,30 @@ int64_t VideoDecoder::guessCorrectPts(AVCodecContext *ctx, const int64_t& reorde
   return pts;
 }
 
-double VideoDecoder::syncVideo(std::shared_ptr<VideoState> videoState, AVFrame* srcFrame, double pts)
+double VideoDecoder::syncVideo(std::shared_ptr<GlobalState> globalState, AVFrame* srcFrame, double pts)
 {
   double frame_delay = 0.0;
 
   if (pts!= 0)
   {
     // if we have pts, set video clock to it
-    videoState->setVideoClock(pts);
+    globalState->setVideoClock(pts);
   }
   else
   {
     // if we aren't given a pts, set it to the clock
-    pts = videoState->videoClock();
+    pts = globalState->videoClock();
   }
 
   // update the video clock
-  auto& videoCodecCtx = videoState->videoCodecCtx();
+  auto& videoCodecCtx = globalState->videoCodecCtx();
   frame_delay = av_q2d(videoCodecCtx->time_base);
 
   // if we are repeating a frame, adjust clock accordingly
   frame_delay += srcFrame->repeat_pict * (frame_delay * 0.5);
 
-  auto videoClock = videoState->videoClock();
-  videoState->setVideoClock(videoClock + frame_delay);
+  auto videoClock = globalState->videoClock();
+  globalState->setVideoClock(videoClock + frame_delay);
 
   return pts;
 }
