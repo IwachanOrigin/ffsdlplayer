@@ -19,9 +19,7 @@ constexpr double AV_NOSYNC_THRESHOLD = 1.0;
 using namespace player;
 
 VideoRenderer::VideoRenderer()
-  : Subject()
 {
-  this->setSubjectType(SubjectType::Renderer);
   m_mutex = SDL_CreateMutex();
 }
 
@@ -75,7 +73,7 @@ int VideoRenderer::start(std::shared_ptr<GlobalState> gs)
 void VideoRenderer::stop()
 {
   m_isRendererFinished = true;
-  std::chrono::milliseconds ms(100);
+  std::chrono::milliseconds ms(200);
   std::this_thread::sleep_for(ms);
 }
 
@@ -95,14 +93,10 @@ int VideoRenderer::displayThread()
 
     double incr = 0, pos = 0;
     // wait indefinitely for the next available event
-    //ret = SDL_WaitEvent(&event);
-    ret = SDL_PollEvent(&event);
+    ret = SDL_WaitEvent(&event);
     if (ret == 0)
     {
       //std::cerr << "SDL_WaitEvent failed : " << SDL_GetError() << std::endl;
-      this->scheduleRefresh(10);
-      std::chrono::milliseconds ms(10);
-      std::this_thread::sleep_for(ms);
       continue;
     }
 
@@ -168,7 +162,6 @@ int VideoRenderer::displayThread()
       }
       break;
     }
-   
   }
   return 0;
 }
@@ -196,13 +189,7 @@ void VideoRenderer::videoRefreshTimer()
   // Check the videopicture queue contains decoded frames
   if (m_gs->sizeVideoFrameDecoded() == 0)
   {
-    if (m_gs->sizeVideoPacketRead() == 0)
-    {
-      this->notifyObservers();
-      return;
-    }
-    
-    this->scheduleRefresh(1);
+    this->scheduleRefresh(10);
     return;
   }
 
@@ -220,6 +207,7 @@ void VideoRenderer::videoRefreshTimer()
     // wipe the frame
     av_frame_free(&frame);
     av_free(frame);
+    this->scheduleRefresh(1);
     return;
   }
 

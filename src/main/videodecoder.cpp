@@ -15,6 +15,11 @@ VideoDecoder::VideoDecoder()
 
 VideoDecoder::~VideoDecoder()
 {
+  if (m_videoRenderer)
+  {
+    m_videoRenderer->stop();
+    m_videoRenderer.reset();
+  }
   this->stop();
   m_gs.reset();
 }
@@ -38,6 +43,11 @@ void VideoDecoder::stop()
 {
   std::unique_lock<std::mutex> lock(m_mutex);
   m_finishedDecoder = true;
+  if (m_videoRenderer)
+  {
+    m_videoRenderer->stop();
+    m_videoRenderer.reset();
+  }
 }
 
 int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
@@ -90,7 +100,7 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
     }
 
     // get a packet from videq
-    int ret = globalState->popVideoPacketRead(packet);
+    auto ret = globalState->popVideoPacketRead(packet);
     if (ret < 0)
     {
       this->notifyObservers();
@@ -153,6 +163,14 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
         pts = this->syncVideo(globalState, pFrame, pts);
         globalState->pushVideoFrameDecoded(pFrame);
       }
+
+      if (!m_videoRenderer)
+      {
+        m_videoRenderer = std::make_unique<VideoRenderer>();
+        m_videoRenderer->start(globalState);
+      }
+      // refresh
+      m_videoRenderer->refresh();
     }
     // wipe the packet
     av_packet_unref(packet);

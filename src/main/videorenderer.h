@@ -7,14 +7,13 @@ extern "C"
 #include <SDL.h>
 }
 
-#include "subject.h"
 #include "globalstate.h"
 #include <atomic>
 
 namespace player
 {
 
-class VideoRenderer : public Subject
+class VideoRenderer
 {
 public:
   explicit VideoRenderer();
@@ -22,6 +21,7 @@ public:
 
   int start(std::shared_ptr<GlobalState> gs);
   void stop();
+  void refresh() { this->scheduleRefresh(1); }
 
 private:
   std::shared_ptr<GlobalState> m_gs = nullptr;

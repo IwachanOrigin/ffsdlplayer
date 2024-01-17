@@ -14,6 +14,7 @@ extern "C"
 
 #include "subject.h"
 #include "globalstate.h"
+#include "videorenderer.h"
 
 namespace player
 {
@@ -29,6 +30,7 @@ public:
 
 private:
   std::shared_ptr<GlobalState> m_gs = nullptr;
+  std::unique_ptr<VideoRenderer> m_videoRenderer = nullptr;
   std::mutex m_mutex;
   bool m_finishedDecoder = false;
 

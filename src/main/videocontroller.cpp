@@ -14,9 +14,6 @@ VideoController::VideoController()
   m_primaryVideoDecoder = std::make_unique<VideoDecoder>();
   m_primaryVideoDecoder->addObserver(this);
   m_primaryVideoDecoder->setSubjectMode(player::SubjectMode::Primary);
-  m_primaryVideoRenderer = std::make_unique<VideoRenderer>();
-  m_primaryVideoRenderer->addObserver(this);
-  m_primaryVideoRenderer->setSubjectMode(player::SubjectMode::Primary);
 }
 
 VideoController::~VideoController()
@@ -116,6 +113,14 @@ void VideoController::update(Subject* subject)
       {
         m_startedDecodeFileCount++;
 
+        // 
+        if (m_startedDecodeFileCount > 1 && m_startedDecodeFileCount < m_movFileVec.size())
+        {
+          auto& beforegs = m_vecGlobalState.at(m_startedDecodeFileCount - 2);
+          beforegs->clear();
+          beforegs.reset();
+        }
+
         // Check all files finished.
         if (m_startedDecodeFileCount >= m_movFileVec.size())
         {
@@ -134,13 +139,22 @@ void VideoController::update(Subject* subject)
             std::this_thread::sleep_for(ms);
             m_secondaryVideoDecoder.reset();
           }
+          for (auto& gs : m_vecGlobalState)
+          {
+            if (gs)
+            {
+              gs->clear();
+              gs.reset();
+            }
+          }
           std::cout << "All VideoDecoder finished." << std::endl;
+          m_isFinished = true;
           break;
         }
 
         switch (decoder->subjectMode())
         {
-          std::chrono::milliseconds ms(20);
+          std::chrono::milliseconds ms(100);
           using enum player::SubjectMode;
           case Primary:
           {
@@ -182,94 +196,6 @@ void VideoController::update(Subject* subject)
     }
     break;
 
-    case Renderer:
-    {
-      auto renderer = static_cast<VideoRenderer*>(subject);
-      if (renderer)
-      {
-        m_startedRenderFileCount++;
-
-        // Check all files finished.
-        if (m_startedRenderFileCount >= m_movFileVec.size())
-        {
-          std::chrono::milliseconds ms(20);
-          if (m_primaryVideoRenderer)
-          {
-            m_primaryVideoRenderer->deleteObserver(this);
-            m_primaryVideoRenderer->stop();
-            std::this_thread::sleep_for(ms);
-            m_primaryVideoRenderer.reset();
-          }
-          if (m_secondaryVideoRenderer)
-          {
-            m_secondaryVideoRenderer->deleteObserver(this);
-            m_secondaryVideoRenderer->stop();
-            std::this_thread::sleep_for(ms);
-            m_secondaryVideoRenderer.reset();
-          }
-          for (auto& gs : m_vecGlobalState)
-          {
-            if (gs)
-            {
-              gs->clear();
-              gs.reset();
-            }
-          }
-          std::cout << "All VideoRenderer finished." << std::endl;
-          m_isFinished = true;
-          break;
-        }
-
-        switch (renderer->subjectMode())
-        {
-          std::chrono::milliseconds ms(20);
-          using enum player::SubjectMode;
-          case Primary:
-          {
-            m_primaryVideoRenderer->deleteObserver(this);
-            m_primaryVideoRenderer->stop();
-            std::this_thread::sleep_for(ms);
-            m_primaryVideoRenderer.reset();
-            auto& beforegs = m_vecGlobalState.at(m_startedRenderFileCount - 1);
-            beforegs->clear();
-            beforegs.reset();
-            std::cout << "Primary VideoRenderer finished." << std::endl;
-
-            // Setup next renderer
-            m_secondaryVideoRenderer = std::make_unique<VideoRenderer>();
-            m_secondaryVideoRenderer->setSubjectMode(player::SubjectMode::Secondary);
-            m_secondaryVideoRenderer->addObserver(this);
-            auto& gs = m_vecGlobalState.at(m_startedRenderFileCount);
-            m_secondaryVideoRenderer->start(gs);
-            std::cout << "Secondary VideoRenderer started." << std::endl;
-          }
-          break;
-
-          case Secondary:
-          {
-            m_secondaryVideoRenderer->deleteObserver(this);
-            m_secondaryVideoRenderer->stop();
-            std::this_thread::sleep_for(ms);
-            m_secondaryVideoRenderer.reset();
-            auto& beforegs = m_vecGlobalState.at(m_startedRenderFileCount - 1);
-            beforegs->clear();
-            beforegs.reset();
-            std::cout << "Secondary VideoRenderer finished." << std::endl;
-
-            // Setup next renderer
-            m_primaryVideoRenderer = std::make_unique<VideoRenderer>();
-            m_primaryVideoRenderer->setSubjectMode(player::SubjectMode::Primary);
-            m_primaryVideoRenderer->addObserver(this);
-            auto& gs = m_vecGlobalState.at(m_startedDecodeFileCount);
-            m_primaryVideoRenderer->start(gs);
-            std::cout << "Primary VideoRenderer started." << std::endl;
-          }
-          break;
-        }
-      }
-    }
-    break;
-
     case None:
     {
       //
@@ -292,9 +218,6 @@ void VideoController::start(std::vector<std::string>& filenames)
   std::this_thread::sleep_for(ms);
 
   m_primaryVideoDecoder->start(gs);
-  std::this_thread::sleep_for(ms);
-
-  m_primaryVideoRenderer->start(gs);
 }
 
 

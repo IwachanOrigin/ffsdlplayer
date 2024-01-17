@@ -12,7 +12,6 @@ enum class SubjectType
   None = 0
   , Reader
   , Decoder
-  , Renderer
 };
 
 enum class SubjectMode
