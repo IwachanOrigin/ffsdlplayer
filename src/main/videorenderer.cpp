@@ -189,7 +189,7 @@ void VideoRenderer::videoRefreshTimer()
   // Check the videopicture queue contains decoded frames
   if (m_gs->sizeVideoFrameDecoded() == 0)
   {
-    this->scheduleRefresh(10);
+    this->scheduleRefresh(1);
     return;
   }
 
@@ -207,7 +207,7 @@ void VideoRenderer::videoRefreshTimer()
     // wipe the frame
     av_frame_free(&frame);
     av_free(frame);
-    this->scheduleRefresh(1);
+    this->scheduleRefresh(100);
     return;
   }
 

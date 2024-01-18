@@ -99,6 +99,8 @@ public:
   AVStream*& videoStream() const { return m_vs->videoStream; }
   AVCodecContext*& audioCodecCtx() const { return m_vs->audioCodecCtx; }
   AVStream*& audioStream() const { return m_vs->audioStream; }
+  bool isFileReadFinished() const { return m_isFileReadFinished; }
+  void setFileReadFinished() { m_isFileReadFinished = true; }
 
   // For Read
   int pushAudioPacketRead(AVPacket* packet);
@@ -161,6 +163,9 @@ private:
   int m_seekReq = 0;
   int m_seekFlags = 0;
   int64_t m_seekPos = 0;
+
+  // file read status
+  std::atomic_bool m_isFileReadFinished = false;
 
   int setupComponent(const int& streamIndex);
   double calcVideoClock();

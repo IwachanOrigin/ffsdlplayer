@@ -6,7 +6,7 @@
 #include "videoreader.h"
 #include "globalstate.h"
 
-#define MAX_QUEUE_SIZE (15 * 1024 * 1024)
+constexpr int MAX_QUEUE_SIZE = 5 * 1024 * 1024;
 
 using namespace player;
 
@@ -107,7 +107,8 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
     }
     else if (packet->stream_index == audioStreamIndex)
     {
-      globalState->pushAudioPacketRead(packet);
+      //globalState->pushAudioPacketRead(packet);
+      av_packet_unref(packet);
     }
     else
     {
@@ -115,6 +116,9 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
       av_packet_unref(packet);
     }
   }
+
+  // Set player finished
+  globalState->setFileReadFinished();
 
   // Notify
   this->notifyObservers();

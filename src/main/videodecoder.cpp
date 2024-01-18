@@ -103,11 +103,14 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
     auto ret = globalState->popVideoPacketRead(packet);
     if (ret < 0)
     {
-      this->notifyObservers();
+      if (globalState->isFileReadFinished())
+      {
+        this->notifyObservers();
+      }
       continue;
     }
 
-    auto flushPacket = globalState->flushPacket();
+    auto& flushPacket = globalState->flushPacket();
     if (flushPacket)
     {
       if (packet->data == flushPacket->data)
@@ -161,6 +164,7 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
       if (frameFinished)
       {
         pts = this->syncVideo(globalState, pFrame, pts);
+        pFrame->pts = pts;
         globalState->pushVideoFrameDecoded(pFrame);
       }
 
@@ -169,8 +173,6 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
         m_videoRenderer = std::make_unique<VideoRenderer>();
         m_videoRenderer->start(globalState);
       }
-      // refresh
-      m_videoRenderer->refresh();
     }
     // wipe the packet
     av_packet_unref(packet);
