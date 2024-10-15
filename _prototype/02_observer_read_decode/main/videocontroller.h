@@ -36,6 +36,8 @@ private:
   std::unique_ptr<VideoDecoder> m_secondaryVideoDecoder = nullptr;
 
   std::atomic_bool m_isFinished = false;
+  std::atomic_bool m_isPrimaryVideoReaderStarted = false;
+  std::atomic_bool m_isSecondaryVideoReaderStarted = false;
   std::atomic_bool m_isPrimaryVideoReaderFinished = false;
   std::atomic_bool m_isSecondaryVideoReaderFinished = false;
   std::atomic_bool m_isVideoDecoderFinished = false;

@@ -174,6 +174,7 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
 
 int64_t VideoDecoder::guessCorrectPts(AVCodecContext *ctx, const int64_t& reordered_pts, const int64_t& dts)
 {
+#if 0
   int64_t pts = AV_NOPTS_VALUE;
 
   if (dts != AV_NOPTS_VALUE)
@@ -206,6 +207,19 @@ int64_t VideoDecoder::guessCorrectPts(AVCodecContext *ctx, const int64_t& reorde
   }
 
   return pts;
+#else
+  int64_t pts = AV_NOPTS_VALUE;
+
+  if (reordered_pts != AV_NOPTS_VALUE)
+  {
+    pts = reordered_pts;
+  }
+  else if (dts != AV_NOPTS_VALUE)
+  {
+    pts = dts;
+  }
+  return pts;
+#endif
 }
 
 double VideoDecoder::syncVideo(std::shared_ptr<GlobalState> globalState, AVFrame* srcFrame, double pts)

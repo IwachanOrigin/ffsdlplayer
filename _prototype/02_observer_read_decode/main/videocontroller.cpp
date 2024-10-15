@@ -51,6 +51,7 @@ void VideoController::update(Subject* subject)
             m_secondaryGlobalState->setup(m_movFileVec.at(1));
             m_secondaryVideoReader->start(m_secondaryGlobalState);
             std::cout << "Secondary VideoReader started." << std::endl;
+            m_isSecondaryVideoReaderStarted = true;
           }
           break;
 
@@ -83,6 +84,11 @@ void VideoController::update(Subject* subject)
               std::cout << "Primary VideoDecoder finished." << std::endl;
 
               m_secondaryVideoDecoder->addObserver(this);
+              while (!m_isSecondaryVideoReaderStarted)
+              {
+                std::chrono::milliseconds ms(10);
+                std::this_thread::sleep_for(ms);
+              }
               m_secondaryVideoDecoder->start(m_secondaryGlobalState);
               std::cout << "Secondary VideoDecoder started." << std::endl;
             }
@@ -127,7 +133,9 @@ void VideoController::start(std::vector<std::string_view>& filenames)
   m_movFileVec = filenames;
   m_primaryGlobalState->setup(m_movFileVec.at(0));
   m_primaryVideoReader->start(m_primaryGlobalState);
+  std::cout << "Primary VideoReader started." << std::endl;
   m_primaryVideoDecoder->start(m_primaryGlobalState);
+  std::cout << "Primary VideoDecoder started." << std::endl;
 }
 
 

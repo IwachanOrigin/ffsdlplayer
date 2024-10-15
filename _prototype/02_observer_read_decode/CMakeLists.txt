@@ -44,16 +44,8 @@ if (WIN32)
   find_package(SDL2 REQUIRED)
 
   # Set up the copy dll list
-  set(EXTERNAL_DLLS
-    ${FFMPEG_PATH_BIN}/avcodec-60.dll
-    ${FFMPEG_PATH_BIN}/avdevice-60.dll
-    ${FFMPEG_PATH_BIN}/avfilter-9.dll
-    ${FFMPEG_PATH_BIN}/avformat-60.dll
-    ${FFMPEG_PATH_BIN}/avutil-58.dll
-    ${FFMPEG_PATH_BIN}/swresample-4.dll
-    ${FFMPEG_PATH_BIN}/swscale-7.dll
-    ${SDL2_BINDIR}/SDL2.dll
-  )
+  file(GLOB EXTERNAL_DLLS "${FFMPEG_PATH_BIN}/*.dll")
+  list(APPEND EXTERNAL_DLLS ${SDL2_BINDIR}/SDL2.dll)
 
   # Set the ffmpeg, sdl2 include directory
   include_directories(${FFMPEG_PATH_INC} ${SDL2_INCLUDE_DIRS})
