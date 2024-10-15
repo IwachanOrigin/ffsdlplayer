@@ -47,9 +47,14 @@ void VideoController::update(Subject* subject)
             m_isPrimaryVideoReaderFinished = true;
             std::cout << "Primary VideoReader finished." << std::endl;
 
+            if (m_movFileVec.size() >= m_startedReadFileCount)
+            {
+              break;
+            }
             m_secondaryVideoReader->addObserver(this);
-            m_secondaryGlobalState->setup(m_movFileVec.at(1));
+            m_secondaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
             m_secondaryVideoReader->start(m_secondaryGlobalState);
+            m_startedReadFileCount++;
             std::cout << "Secondary VideoReader started." << std::endl;
             m_isSecondaryVideoReaderStarted = true;
           }
@@ -58,8 +63,19 @@ void VideoController::update(Subject* subject)
           case Secondary:
           {
             m_secondaryVideoReader->deleteObserver(this);
-            std::cout << "Secondary VideoReader finished." << std::endl;
             m_isSecondaryVideoReaderFinished = true;
+            std::cout << "Secondary VideoReader finished." << std::endl;
+
+            if (m_movFileVec.size() >= m_startedReadFileCount)
+            {
+              break;
+            }
+            m_primaryVideoReader->addObserver(this);
+            m_primaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
+            m_primaryVideoReader->start(m_secondaryGlobalState);
+            m_startedReadFileCount++;
+            std::cout << "Primary VideoReader started." << std::endl;
+            m_isPrimaryVideoReaderStarted = true;
           }
           break;
         }
@@ -131,7 +147,8 @@ void VideoController::update(Subject* subject)
 void VideoController::start(std::vector<std::string_view>& filenames)
 {
   m_movFileVec = filenames;
-  m_primaryGlobalState->setup(m_movFileVec.at(0));
+  m_primaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
+  m_startedReadFileCount++;
   m_primaryVideoReader->start(m_primaryGlobalState);
   std::cout << "Primary VideoReader started." << std::endl;
   m_primaryVideoDecoder->start(m_primaryGlobalState);
