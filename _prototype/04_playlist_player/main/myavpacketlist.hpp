@@ -1,6 +1,6 @@
 
-#ifndef MY_AV_PACKET_LIST_HPP_
-#define MY_AV_PACKET_LIST_HPP_
+#ifndef MY_AV_PACKET_LIST_H_
+#define MY_AV_PACKET_LIST_H_
 
 extern "C"
 {
@@ -19,6 +19,6 @@ struct MyAVPacketList
 
 } // player
 
-#endif // MY_AV_PACKET_LIST_HPP_
+#endif // MY_AV_PACKET_LIST_H_
 
 

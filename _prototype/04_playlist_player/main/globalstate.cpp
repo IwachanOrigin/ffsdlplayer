@@ -1,9 +1,4 @@
 
-extern "C"
-{
-#include "libavutil/time.h"
-}
-
 #include "globalstate.hpp"
 #include <iostream>
 
@@ -113,20 +108,6 @@ int GlobalState::setup(std::string_view filename)
     return -1;
   }
 
-  // return with error in case no audio stream was found
-  if (m_vs->audioStreamIndex == -1)
-  {
-    std::cerr << "Could not open audio stream" << std::endl;
-    return -1;
-  }
-
-  ret = this->setupComponent(m_vs->audioStreamIndex);
-  if (ret < 0)
-  {
-    std::cerr << "Could not setup audio component." << std::endl;
-    return -1;
-  }
-
   return 0;
 }
 
@@ -218,95 +199,20 @@ int GlobalState::setupComponent(const int& streamIndex)
     return -1;
   }
 
-  auto codecType = static_cast<int>(codecCtx->codec_type);
-  switch (codecType)
+  switch (codecCtx->codec_type)
   {
-    case AVMEDIA_TYPE_AUDIO:
-    {
-      m_vs->audioCodecCtx = std::move(codecCtx);
-      m_vs->audioStream = m_vs->inputFmtCtx->streams[streamIndex];
-    }
-    break;
-
     case AVMEDIA_TYPE_VIDEO:
-    {
       m_vs->videoCodecCtx = std::move(codecCtx);
       m_vs->videoStream = m_vs->inputFmtCtx->streams[streamIndex];
-    }
-    break;
+      break;
+
+    case AVMEDIA_TYPE_UNKNOWN:
+    case AVMEDIA_TYPE_AUDIO:
+    case AVMEDIA_TYPE_DATA:
+    case AVMEDIA_TYPE_SUBTITLE:
+    case AVMEDIA_TYPE_ATTACHMENT:
+    case AVMEDIA_TYPE_NB:
+      break;
   }
   return 0;
 }
-
-double GlobalState::masterClock()
-{
-  switch (m_avSyncType)
-  {
-    using enum SYNC_TYPE;
-    case AV_SYNC_VIDEO_MASTER:
-    {
-      return this->calcVideoClock();
-    }
-    break;
-
-    case AV_SYNC_AUDIO_MASTER:
-    {
-      return this->calcAudioClock();
-    }
-    break;
-
-    case AV_SYNC_EXTERNAL_MASTER:
-    {
-      return this->calcExternalClock();
-    }
-    break;
-  }
-
-  std::cerr << "Error : Undefined a/v sync type" << std::endl;
-  return -1;
-}
-
-double GlobalState::calcVideoClock()
-{
-  double delta = (av_gettime() - m_vs->videoDecodeCurrentPtsTime) / 1000000.0;
-  return m_vs->videoDecodeCurrentPts + delta;
-}
-
-double GlobalState::calcAudioClock()
-{
-  double pts = m_vs->audioClock;
-  int hwBufSize = m_vs->audioBufSize - m_vs->audioBufIndex;
-  int bytesPerSec = 0;
-  int n = 2 * m_vs->audioCodecCtx->ch_layout.nb_channels;
-
-  if (m_vs->audioStream)
-  {
-    bytesPerSec = m_vs->audioCodecCtx->sample_rate * n;
-  }
-
-  if (bytesPerSec)
-  {
-    pts -= (double) hwBufSize / bytesPerSec;
-  }
-
-  return pts;
-}
-
-double GlobalState::calcExternalClock()
-{
-  m_externalClockTime = av_gettime();
-  m_externalClock = m_externalClockTime / 1000000.0;
-
-  return m_externalClock;
-}
-
-void GlobalState::streamSeek(const int64_t& pos, const int& rel)
-{
-  if (!m_seekReq)
-  {
-    m_seekPos = pos;
-    m_seekFlags = rel < 0 ? AVSEEK_FLAG_BACKWARD : 0;
-    m_seekReq = 1;
-  }
-}
-

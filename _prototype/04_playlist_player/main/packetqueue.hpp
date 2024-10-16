@@ -1,6 +1,6 @@
 
-#ifndef PACKET_QUEUE_HPP_
-#define PACKET_QUEUE_HPP_
+#ifndef PACKET_QUEUE_H_
+#define PACKET_QUEUE_H_
 
 extern "C"
 {
@@ -8,14 +8,13 @@ extern "C"
 #include <libavformat/avformat.h>
 }
 
+#include "myavpacketlist.hpp"
 #include <queue>
 #include <mutex>
 #include <condition_variable>
 
 namespace player
 {
-
-class MyAVPacketList;
 
 class PacketQueue
 {
@@ -42,4 +41,4 @@ private:
 
 } // player
 
-#endif // PACKET_QUEUE_HPP_
+#endif // PACKET_QUEUE_H_

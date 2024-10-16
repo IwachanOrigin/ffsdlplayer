@@ -1,6 +1,6 @@
 
-#ifndef STRING_HELPER_HPP_
-#define STRING_HELPER_HPP_
+#ifndef STRING_HELPER_H_
+#define STRING_HELPER_H_
 
 #ifdef _WIN32
 #include <windows.h>
@@ -65,4 +65,4 @@ std::wstring stringToWstring(T str)
 
 } // namespace
 
-#endif // STRING_HELPER_HPP_
+#endif // STRING_HELPER_H_

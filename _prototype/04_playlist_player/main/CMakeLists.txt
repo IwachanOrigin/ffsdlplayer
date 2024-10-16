@@ -6,16 +6,18 @@ set(main_src
   globalstate.hpp
   main.cpp
   myavpacketlist.hpp
+  observer.hpp
   packetqueue.cpp
   packetqueue.hpp
-  playlist.hpp
   stringhelper.hpp
+  subject.cpp
+  subject.hpp
+  videocontroller.cpp
+  videocontroller.hpp
   videodecoder.cpp
   videodecoder.hpp
   videoreader.cpp
   videoreader.hpp
-  videorenderer.cpp
-  videorenderer.hpp
 )
 
 add_executable(

@@ -45,6 +45,7 @@ if (WIN32)
 
   # Set up the copy dll list
   file(GLOB EXTERNAL_DLLS "${FFMPEG_PATH_BIN}/*.dll")
+  list(APPEND EXTERNAL_DLLS ${SDL2_BINDIR}/SDL2.dll)
 
   # Set the ffmpeg, sdl2 include directory
   include_directories(

@@ -1,6 +1,6 @@
 
-#ifndef VIDEO_DECODER_HPP_
-#define VIDEO_DECODER_HPP_
+#ifndef VIDEO_DECODER_H_
+#define VIDEO_DECODER_H_
 
 extern "C"
 {
@@ -12,24 +12,24 @@ extern "C"
 #include <libswresample/swresample.h>
 }
 
+#include "subject.hpp"
 #include "globalstate.hpp"
 
 namespace player
 {
 
-class VideoDecoder
+class VideoDecoder : public Subject
 {
 public:
   explicit VideoDecoder();
   virtual ~VideoDecoder();
 
-  int start(std::shared_ptr<GlobalState> vs);
+  int start(std::shared_ptr<GlobalState> globalState);
   void stop();
 
 private:
-  std::shared_ptr<GlobalState> m_gs = nullptr;
   std::mutex m_mutex;
-  bool m_finishedDecoder = false;
+  bool m_finishedDecoder;
 
   int decodeThread(std::shared_ptr<GlobalState> vs);
   int64_t guessCorrectPts(AVCodecContext* ctx, const int64_t& reordered_pts, const int64_t& dts);
@@ -38,5 +38,4 @@ private:
 
 } // player
 
-#endif // VIDEO_DECODER_HPP_
-
+#endif // VIDEO_DECODER_H_

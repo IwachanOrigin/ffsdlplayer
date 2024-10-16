@@ -1,10 +1,16 @@
 
-#ifndef FRAME_QUEUE_HPP_
-#define FRAME_QUEUE_HPP_
+#ifndef FRAME_QUEUE_H_
+#define FRAME_QUEUE_H_
 
 extern "C"
 {
-#include "libavutil/frame.h"
+#include "libavcodec/avcodec.h"
+#include "libavfilter/avfilter.h"
+#include "libavformat/avformat.h"
+#include "libavutil/avutil.h"
+#include "libswresample/swresample.h"
+#include "libswscale/swscale.h"
+#include "libavutil/imgutils.h"
 }
 
 #include <queue>

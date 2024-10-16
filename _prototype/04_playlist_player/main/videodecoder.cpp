@@ -8,7 +8,9 @@ using namespace player;
 const int MAX_QUEUE_SIZE = 50;
 
 VideoDecoder::VideoDecoder()
+  : Subject()
 {
+  this->setSubjectType(SubjectType::Decoder);
 }
 
 VideoDecoder::~VideoDecoder()
@@ -16,19 +18,19 @@ VideoDecoder::~VideoDecoder()
   this->stop();
 }
 
-int VideoDecoder::start(std::shared_ptr<GlobalState> vs)
+int VideoDecoder::start(std::shared_ptr<GlobalState> gs)
 {
-  m_gs = vs;
-  if (!m_gs)
+  if (!gs)
   {
     return -1;
   }
 
-  m_finishedDecoder = false;
-  std::thread([&](VideoDecoder *decoder)
+  std::thread([gs, this]()
   {
-    decoder->decodeThread(m_gs);
-  }, this).detach();
+    m_finishedDecoder = false;
+    auto ret = this->decodeThread(gs);
+    std::cout << "decode thread : " << ret << std::endl;
+  }).detach();
   return 0;
 }
 
@@ -38,11 +40,8 @@ void VideoDecoder::stop()
   m_finishedDecoder = true;
 }
 
-int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
+int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> globalState)
 {
-  // retrieve global videostate
-  auto globalState = vs;
-
   // allocate an AVPacket to be used to retrieve data from the videoq.
   AVPacket* packet = av_packet_alloc();
   if (packet == nullptr)
@@ -82,6 +81,10 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
     // check audio and video packets queues size
     if (globalState->sizeAudioFrameDecoded() + globalState->sizeVideoFrameDecoded() > MAX_QUEUE_SIZE)
     {
+      // !!!!!!! DELETE !!!!!!!!
+      globalState->clearAudioFrameDecoded();
+      globalState->clearVideoFrameDecoded();
+
       // wait for audio and video queues to decrease size
       std::this_thread::sleep_for(delayms);
       continue;
@@ -91,6 +94,7 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
     int ret = globalState->popVideoPacketRead(packet);
     if (ret < 0)
     {
+      this->notifyObservers();
       continue;
     }
 
@@ -155,15 +159,55 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
     av_packet_unref(packet);
   }
 
+  // !!!!!!! DELETE !!!!!!!!
+  globalState->clearAudioFrameDecoded();
+  globalState->clearVideoFrameDecoded();
+
   // wipe the frame
   av_frame_free(&pFrame);
   av_free(pFrame);
+
+  globalState.reset();
 
   return 0;
 }
 
 int64_t VideoDecoder::guessCorrectPts(AVCodecContext *ctx, const int64_t& reordered_pts, const int64_t& dts)
 {
+#if 0
+  int64_t pts = AV_NOPTS_VALUE;
+
+  if (dts != AV_NOPTS_VALUE)
+  {
+    ctx->pts_correction_num_faulty_dts += dts <= ctx->pts_correction_last_dts;
+    ctx->pts_correction_last_dts = dts;
+  }
+  else if (reordered_pts != AV_NOPTS_VALUE)
+  {
+    ctx->pts_correction_last_dts = reordered_pts;
+  }
+
+  if (reordered_pts != AV_NOPTS_VALUE)
+  {
+    ctx->pts_correction_num_faulty_pts += reordered_pts <= ctx->pts_correction_last_pts;
+    ctx->pts_correction_last_pts = reordered_pts;
+  }
+  else if (dts != AV_NOPTS_VALUE)
+  {
+    ctx->pts_correction_last_pts = dts;
+  }
+
+  if ((ctx->pts_correction_num_faulty_pts <= ctx->pts_correction_num_faulty_dts || dts == AV_NOPTS_VALUE) && reordered_pts != AV_NOPTS_VALUE)
+  {
+    pts = reordered_pts;
+  }
+  else
+  {
+    pts = dts;
+  }
+
+  return pts;
+#else
   int64_t pts = AV_NOPTS_VALUE;
 
   if (reordered_pts != AV_NOPTS_VALUE)
@@ -175,6 +219,7 @@ int64_t VideoDecoder::guessCorrectPts(AVCodecContext *ctx, const int64_t& reorde
     pts = dts;
   }
   return pts;
+#endif
 }
 
 double VideoDecoder::syncVideo(std::shared_ptr<GlobalState> globalState, AVFrame* srcFrame, double pts)

@@ -1,8 +1,7 @@
 
-#ifndef VIDEO_READER_HPP_
-#define VIDEO_READER_HPP_
+#ifndef VIDEO_READER_H_
+#define VIDEO_READER_H_
 
-#include <string>
 #include <memory>
 #include <atomic>
 
@@ -14,34 +13,30 @@ extern "C"
 #include <libavutil/time.h>
 #include <libavutil/opt.h>
 #include <libavformat/avformat.h>
-#include <libswscale/swscale.h>
-#include <libswresample/swresample.h>
-#include <SDL.h>
-#include <SDL_thread.h>
 }
+
+#include "subject.hpp"
 
 namespace player
 {
 
 class GlobalState;
 
-class VideoReader
+class VideoReader : public Subject
 {
 public:
-  explicit VideoReader() = default;
-  ~VideoReader() = default;
+  explicit VideoReader();
+  virtual ~VideoReader();
 
   int start(std::shared_ptr<GlobalState> gs);
   void stop();
 
 private:
-  std::shared_ptr<GlobalState> m_gs = nullptr;
-  std::atomic_bool m_isFinished = false;
+  std::atomic_bool m_isFinished;
 
   int readThread(std::shared_ptr<GlobalState> gs);
 };
 
 }
 
-#endif // VIDEO_READER_HPP_
-
+#endif // VIDEO_READER_H_
