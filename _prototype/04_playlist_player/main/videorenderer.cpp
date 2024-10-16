@@ -24,38 +24,22 @@ constexpr double AV_NOSYNC_THRESHOLD = 1.0;
 using namespace player;
 
 VideoRenderer::VideoRenderer()
+  : m_screen(SDL_CreateWindow("display", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE), SDL_DestroyWindow)
+  , m_renderer(SDL_CreateRenderer(m_screen.get(), -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE), SDL_DestroyRenderer)
+  , m_mutex(SDL_CreateMutex(), SDL_DestroyMutex)
 {
-  m_mutex = SDL_CreateMutex();
+  SDL_GL_SetSwapInterval(1);
 }
 
 VideoRenderer::~VideoRenderer()
 {
   this->stop();
 
-  if (m_mutex)
-  {
-    SDL_DestroyMutex(m_mutex);
-    m_mutex = nullptr;
-  }
-
   if (m_texture)
   {
     SDL_DestroyTexture(m_texture);
     m_texture = nullptr;
   }
-
-  if (m_renderer)
-  {
-    SDL_DestroyRenderer(m_renderer);
-    m_renderer = nullptr;
-  }
-
-  if (m_screen)
-  {
-    SDL_DestroyWindow(m_screen);
-    m_screen = nullptr;
-  }
-
 }
 
 int VideoRenderer::start(std::shared_ptr<GlobalState> gs)
@@ -179,18 +163,6 @@ int VideoRenderer::displayThread()
     SDL_DestroyTexture(m_texture);
     m_texture = nullptr;
   }
-
-  if (m_renderer)
-  {
-    SDL_DestroyRenderer(m_renderer);
-    m_renderer = nullptr;
-  }
-
-  if (m_screen)
-  {
-    SDL_DestroyWindow(m_screen);
-    m_screen = nullptr;
-  }
 #endif
   return 0;
 }
@@ -308,44 +280,12 @@ Uint32 VideoRenderer::sdlRefreshTimerCb(Uint32 interval, void* param)
 void VideoRenderer::videoDisplay(AVFrame* frame)
 {
   auto& videoCodecCtx = m_gs->videoCodecCtx();
-  // Create window, renderer and textures if not already created
-  if (!m_screen)
-  {
-    //int flags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS | SDL_WINDOW_TOOLTIP;
-    int flags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE;
-    m_screen = SDL_CreateWindow(
-      "display"
-      , SDL_WINDOWPOS_UNDEFINED
-      , SDL_WINDOWPOS_UNDEFINED
-      , videoCodecCtx->width / 2
-      , videoCodecCtx->height / 2
-      , flags
-      );
-    SDL_GL_SetSwapInterval(1);
-  }
-
-  // Check window was correctly created
-  if (!m_screen)
-  {
-    std::cerr << "SDL : could not create window - exiting" << std::endl;
-    return;
-  }
-
-  if (!m_renderer)
-  {
-    // Create a 2d rendering context for the sdl_window
-    m_renderer = SDL_CreateRenderer(
-      m_screen
-      , -1
-      , SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE
-      );
-  }
 
   if (!m_texture)
   {
     // Create a texture for a rendering context
     m_texture = SDL_CreateTexture(
-      m_renderer
+      m_renderer.get()
       , SDL_PIXELFORMAT_YV12
       , SDL_TEXTUREACCESS_STREAMING
       , videoCodecCtx->width
@@ -377,7 +317,7 @@ void VideoRenderer::videoDisplay(AVFrame* frame)
     // Get the size of a window's client area
     int screenWidth = 0;
     int screenHeight = 0;
-    SDL_GetWindowSize(m_screen, &screenWidth, &screenHeight);
+    SDL_GetWindowSize(m_screen.get(), &screenWidth, &screenHeight);
 
     // Global sdl_surface height
     h = screenHeight;
@@ -407,7 +347,7 @@ void VideoRenderer::videoDisplay(AVFrame* frame)
       rect.h = 2 * h;
 
       // Lock screen mutex
-      SDL_LockMutex(m_mutex);
+      SDL_LockMutex(m_mutex.get());
 
       // Update the texture with the new pixel data
       SDL_UpdateYUVTexture(
@@ -422,16 +362,16 @@ void VideoRenderer::videoDisplay(AVFrame* frame)
         );
 
       // Clear the current rendering target with the drawing color
-      SDL_RenderClear(m_renderer);
+      SDL_RenderClear(m_renderer.get());
 
       // Copy a portion of the texture to the current rendering target
-      SDL_RenderCopy(m_renderer, m_texture, &rect, nullptr);
+      SDL_RenderCopy(m_renderer.get(), m_texture, &rect, nullptr);
 
       // Update the screen with any rendering performed since the previous call
-      SDL_RenderPresent(m_renderer);
+      SDL_RenderPresent(m_renderer.get());
 
       // Unlock screen mutex
-      SDL_UnlockMutex(m_mutex);
+      SDL_UnlockMutex(m_mutex.get());
     }
   }
 }

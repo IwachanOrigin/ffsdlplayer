@@ -9,6 +9,7 @@ extern "C"
 
 #include "globalstate.hpp"
 #include <atomic>
+#include <memory>
 
 namespace player
 {
@@ -24,10 +25,10 @@ public:
 
 private:
   std::shared_ptr<GlobalState> m_gs = nullptr;
-  SDL_Window* m_screen = nullptr;
+  std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> m_screen;
+  std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> m_renderer;
+  std::unique_ptr<SDL_mutex, decltype(&SDL_DestroyMutex)> m_mutex;
   SDL_Texture* m_texture = nullptr;
-  SDL_Renderer* m_renderer = nullptr;
-  SDL_mutex* m_mutex = nullptr;
   std::atomic_bool m_isRendererFinished = false;
 
   int displayThread();
