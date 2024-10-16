@@ -60,6 +60,7 @@ void VideoController::update(Subject* subject)
             m_secondaryVideoReader->start(m_secondaryGlobalState);
             m_startedReadFileCount++;
             std::cout << "Secondary VideoReader started." << std::endl;
+            m_isPrimaryVideoReaderStarted = false;
             m_isSecondaryVideoReaderStarted = true;
           }
           break;
@@ -84,6 +85,7 @@ void VideoController::update(Subject* subject)
             m_startedReadFileCount++;
             std::cout << "Primary VideoReader started." << std::endl;
             m_isPrimaryVideoReaderStarted = true;
+            m_isSecondaryVideoReaderStarted = false;
           }
           break;
         }
