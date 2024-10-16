@@ -18,18 +18,19 @@ VideoDecoder::~VideoDecoder()
   this->stop();
 }
 
-int VideoDecoder::start(std::shared_ptr<GlobalState> vs)
+int VideoDecoder::start(std::shared_ptr<GlobalState> gs)
 {
-  m_gs = vs;
-  if (!m_gs)
+  if (!gs)
   {
     return -1;
   }
 
-  std::thread([&](VideoDecoder *decoder)
+  std::thread([gs, this]()
   {
-    decoder->decodeThread(m_gs);
-  }, this).detach();
+    m_finishedDecoder = false;
+    auto ret = this->decodeThread(gs);
+    std::cout << "decode thread : " << ret << std::endl;
+  }).detach();
   return 0;
 }
 
@@ -39,11 +40,8 @@ void VideoDecoder::stop()
   m_finishedDecoder = true;
 }
 
-int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
+int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> globalState)
 {
-  // retrieve global videostate
-  auto globalState = vs;
-
   // allocate an AVPacket to be used to retrieve data from the videoq.
   AVPacket* packet = av_packet_alloc();
   if (packet == nullptr)
@@ -168,6 +166,8 @@ int VideoDecoder::decodeThread(std::shared_ptr<GlobalState> vs)
   // wipe the frame
   av_frame_free(&pFrame);
   av_free(pFrame);
+
+  globalState.reset();
 
   return 0;
 }

@@ -17,8 +17,10 @@ int main(int argc, char* argv[])
   }
 
   std::vector<std::string_view> movieFileVec;
-  movieFileVec.push_back(argv[1]);
-  movieFileVec.push_back(argv[2]);
+  for (int i = 1; i < argc; i++)
+  {
+    movieFileVec.push_back(argv[i]);
+  }
   VideoController vc;
   vc.start(movieFileVec);
   std::chrono::milliseconds ms(100);

@@ -32,8 +32,7 @@ public:
   void stop();
 
 private:
-  std::shared_ptr<GlobalState> m_gs = nullptr;
-  std::atomic_bool m_isFinished = false;
+  std::atomic_bool m_isFinished;
 
   int readThread(std::shared_ptr<GlobalState> gs);
 };

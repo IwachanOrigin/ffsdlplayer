@@ -23,17 +23,18 @@ VideoReader::~VideoReader()
 
 int VideoReader::start(std::shared_ptr<GlobalState> gs)
 {
-  m_gs = gs;
-  if (m_gs == nullptr)
+  if (gs == nullptr)
   {
     return -1;
   }
 
   // start read thread
-  std::thread([&](VideoReader *reader)
+  std::thread([gs, this]()
   {
-    reader->readThread(m_gs);
-  }, this).detach();
+    m_isFinished = false;
+    auto ret = this->readThread(gs);
+    std::cout << "read thread : " << ret << std::endl;
+  }).detach();
 
   return 0;
 }
@@ -43,12 +44,9 @@ void VideoReader::stop()
   m_isFinished = true;
 }
 
-int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
+int VideoReader::readThread(std::shared_ptr<GlobalState> globalState)
 {
   int ret = -1;
-
-  // retrieve global VideoState reference
-  auto globalState = gs;
 
   // Set the AVFormatContext for the global videostate ref
   auto& formatCtx = globalState->inputFmtCtx();
@@ -61,8 +59,8 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
   }
 
   // Init stream index.
-  auto& videoStreamIndex = m_gs->videoStreamIndex();
-  auto& audioStreamIndex = m_gs->audioStreamIndex();
+  auto& videoStreamIndex = globalState->videoStreamIndex();
+  auto& audioStreamIndex = globalState->audioStreamIndex();
 
   // Init
   std::chrono::milliseconds delayms(10);
@@ -123,6 +121,8 @@ int VideoReader::readThread(std::shared_ptr<GlobalState> gs)
 
   // Notify
   this->notifyObservers();
+
+  globalState.reset();
 
   return 0;
 }

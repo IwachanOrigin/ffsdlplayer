@@ -24,14 +24,12 @@ GlobalState::~GlobalState()
 
   if (m_vs->audioCodecCtx)
   {
-    avcodec_close(m_vs->audioCodecCtx);
     avcodec_free_context(&m_vs->audioCodecCtx);
     m_vs->audioCodecCtx = nullptr;
   }
 
   if (m_vs->videoCodecCtx)
   {
-    avcodec_close(m_vs->videoCodecCtx);
     avcodec_free_context(&m_vs->videoCodecCtx);
     m_vs->videoCodecCtx = nullptr;
   }
@@ -204,11 +202,17 @@ int GlobalState::setupComponent(const int& streamIndex)
   switch (codecCtx->codec_type)
   {
     case AVMEDIA_TYPE_VIDEO:
-    {
       m_vs->videoCodecCtx = std::move(codecCtx);
       m_vs->videoStream = m_vs->inputFmtCtx->streams[streamIndex];
-    }
-    break;
+      break;
+
+    case AVMEDIA_TYPE_UNKNOWN:
+    case AVMEDIA_TYPE_AUDIO:
+    case AVMEDIA_TYPE_DATA:
+    case AVMEDIA_TYPE_SUBTITLE:
+    case AVMEDIA_TYPE_ATTACHMENT:
+    case AVMEDIA_TYPE_NB:
+      break;
   }
   return 0;
 }

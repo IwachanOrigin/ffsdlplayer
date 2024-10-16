@@ -24,13 +24,12 @@ public:
   explicit VideoDecoder();
   virtual ~VideoDecoder();
 
-  int start(std::shared_ptr<GlobalState> vs);
+  int start(std::shared_ptr<GlobalState> globalState);
   void stop();
 
 private:
-  std::shared_ptr<GlobalState> m_gs = nullptr;
   std::mutex m_mutex;
-  bool m_finishedDecoder = false;
+  bool m_finishedDecoder;
 
   int decodeThread(std::shared_ptr<GlobalState> vs);
   int64_t guessCorrectPts(AVCodecContext* ctx, const int64_t& reordered_pts, const int64_t& dts);

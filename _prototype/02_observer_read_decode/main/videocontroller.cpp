@@ -47,9 +47,13 @@ void VideoController::update(Subject* subject)
             m_isPrimaryVideoReaderFinished = true;
             std::cout << "Primary VideoReader finished." << std::endl;
 
-            if (m_movFileVec.size() >= m_startedReadFileCount)
+            if (m_movFileVec.size() <= m_startedReadFileCount)
             {
               break;
+            }
+            if (!m_secondaryGlobalState)
+            {
+              m_secondaryGlobalState = std::make_shared<GlobalState>();
             }
             m_secondaryVideoReader->addObserver(this);
             m_secondaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
@@ -66,13 +70,17 @@ void VideoController::update(Subject* subject)
             m_isSecondaryVideoReaderFinished = true;
             std::cout << "Secondary VideoReader finished." << std::endl;
 
-            if (m_movFileVec.size() >= m_startedReadFileCount)
+            if (m_movFileVec.size() <= m_startedReadFileCount)
             {
               break;
             }
+            if (!m_primaryGlobalState)
+            {
+              m_primaryGlobalState = std::make_shared<GlobalState>();
+            }
             m_primaryVideoReader->addObserver(this);
             m_primaryGlobalState->setup(m_movFileVec.at(m_startedReadFileCount));
-            m_primaryVideoReader->start(m_secondaryGlobalState);
+            m_primaryVideoReader->start(m_primaryGlobalState);
             m_startedReadFileCount++;
             std::cout << "Primary VideoReader started." << std::endl;
             m_isPrimaryVideoReaderStarted = true;
@@ -98,6 +106,16 @@ void VideoController::update(Subject* subject)
               m_primaryVideoDecoder->stop();
               m_primaryVideoDecoder->deleteObserver(this);
               std::cout << "Primary VideoDecoder finished." << std::endl;
+              m_primaryGlobalState.reset();
+
+              if (m_movFileVec.size() <= m_startedReadFileCount)
+              {
+                // For the wait time when the secondary primary thread finish.
+                std::chrono::milliseconds ms(100);
+                std::this_thread::sleep_for(ms);
+                m_isFinished = true;
+                break;
+              }
 
               m_secondaryVideoDecoder->addObserver(this);
               while (!m_isSecondaryVideoReaderStarted)
@@ -117,11 +135,26 @@ void VideoController::update(Subject* subject)
             {
               m_secondaryVideoDecoder->stop();
               m_secondaryVideoDecoder->deleteObserver(this);
-              std::cout << "Secondary VideoReader finished." << std::endl;
-              // For the wait time when the secondary decode thread finish.
-              std::chrono::milliseconds ms(100);
-              std::this_thread::sleep_for(ms);
-              m_isFinished = true;
+              std::cout << "Secondary VideoDecoder finished." << std::endl;
+              m_secondaryGlobalState.reset();
+
+              if (m_movFileVec.size() <= m_startedReadFileCount)
+              {
+                // For the wait time when the secondary decode thread finish.
+                std::chrono::milliseconds ms(100);
+                std::this_thread::sleep_for(ms);
+                m_isFinished = true;
+                break;
+              }
+
+              m_primaryVideoDecoder->addObserver(this);
+              while (!m_isPrimaryVideoReaderStarted)
+              {
+                std::chrono::milliseconds ms(10);
+                std::this_thread::sleep_for(ms);
+              }
+              m_primaryVideoDecoder->start(m_primaryGlobalState);
+              std::cout << "Primary VideoDecoder started." << std::endl;
             }
           }
           break;
