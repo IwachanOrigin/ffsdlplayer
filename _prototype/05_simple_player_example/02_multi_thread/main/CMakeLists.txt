@@ -1,23 +1,6 @@
 
 set(main_src
-  framequeue.cpp
-  framequeue.hpp
-  globalstate.cpp
-  globalstate.hpp
   main.cpp
-  myavpacketlist.hpp
-  observer.hpp
-  packetqueue.cpp
-  packetqueue.hpp
-  stringhelper.hpp
-  subject.cpp
-  subject.hpp
-  videocontroller.cpp
-  videocontroller.hpp
-  videodecoder.cpp
-  videodecoder.hpp
-  videoreader.cpp
-  videoreader.hpp
 )
 
 add_executable(

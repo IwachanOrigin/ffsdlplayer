@@ -34,8 +34,8 @@ TEST_RUN=$4
 
 # Set Qt_install_dir
 #QT="C:/software/Qt/6.5.3/msvc2019_64"
-FFMPEG_PATH="C:/software/ffmpeg-n7.0-latest-win64-lgpl-shared-7.0"
-SDL2_PATH="C:/software/SDL2-2.30.7"
+FFMPEG_PATH="D:/software/ffmpeg-n7.1-latest-win64-gpl-shared-7.1"
+SDL2_PATH="D:/software/SDL2-2.30.8"
 
 echo "FFMPEG_PATH = ${FFMPEG_PATH}"
 echo "SDL2_PATH = ${SDL2_PATH}"
