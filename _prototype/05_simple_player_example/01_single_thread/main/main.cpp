@@ -130,7 +130,8 @@ void play_video(const char* filename)
   texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV,
                               SDL_TEXTUREACCESS_STREAMING | SDL_TEXTUREACCESS_TARGET,
                               vidpar->width, vidpar->height);
-  if (!texture) {
+  if (!texture)
+  {
     perror("texture");
     //goto clean_texture;
     exit(EXIT_FAILURE);
@@ -199,8 +200,10 @@ void display(AVCodecContext* vidCtx, AVPacket* packet, AVFrame* frame, SDL_Rect*
              SDL_Texture* texture, SDL_Renderer* renderer, double fpsrendering)
 {
   // パケットをデコードしてフレームに変換
-  if (avcodec_send_packet(vidCtx, packet) == 0) {
-    while (avcodec_receive_frame(vidCtx, frame) == 0) {
+  if (avcodec_send_packet(vidCtx, packet) == 0)
+  {
+    while (avcodec_receive_frame(vidCtx, frame) == 0)
+    {
       // フレームをSDLテクスチャにコピー
       SDL_UpdateYUVTexture(texture, rect, 
                            frame->data[0], frame->linesize[0],
@@ -220,8 +223,10 @@ void display(AVCodecContext* vidCtx, AVPacket* packet, AVFrame* frame, SDL_Rect*
 void playaudio(AVCodecContext* audCtx, AVPacket* packet, AVFrame* frame, SDL_AudioDeviceID auddev)
 {
   // パケットをデコードしてオーディオフレームに変換
-  if (avcodec_send_packet(audCtx, packet) == 0) {
-    while (avcodec_receive_frame(audCtx, frame) == 0) {
+  if (avcodec_send_packet(audCtx, packet) == 0)
+  {
+    while (avcodec_receive_frame(audCtx, frame) == 0)
+    {
       // オーディオデータをSDLに送る
       SDL_QueueAudio(auddev, frame->data[0], frame->linesize[0]);
     }

@@ -185,7 +185,7 @@ void play_video(const char* filename)
   if (screen == NULL)
   {
     screen = SDL_CreateWindow("Fplay", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-      vidpar->width, vidpar->height, SDL_WINDOW_OPENGL);
+                              vidpar->width, vidpar->height, SDL_WINDOW_OPENGL);
     if (!screen)
     {
       perror("screen");
@@ -200,13 +200,15 @@ void play_video(const char* filename)
   }
 
   // テクスチャの更新
-  if (texture != NULL) {
+  if (texture != NULL)
+  {
     SDL_DestroyTexture(texture);
   }
   texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV,
-    SDL_TEXTUREACCESS_STREAMING | SDL_TEXTUREACCESS_TARGET,
-    vidpar->width, vidpar->height);
-  if (!texture) {
+                              SDL_TEXTUREACCESS_STREAMING | SDL_TEXTUREACCESS_TARGET,
+                              vidpar->width, vidpar->height);
+  if (!texture)
+  {
     perror("texture");
     exit(EXIT_FAILURE);
   }
@@ -252,9 +254,9 @@ void play_video(const char* filename)
 void displayFrame(AVFrame* frame, SDL_Rect* rect, SDL_Texture* texture, SDL_Renderer* renderer, double fpsrendering)
 {
   SDL_UpdateYUVTexture(texture, rect,
-    frame->data[0], frame->linesize[0],
-    frame->data[1], frame->linesize[1],
-    frame->data[2], frame->linesize[2]);
+                       frame->data[0], frame->linesize[0],
+                       frame->data[1], frame->linesize[1],
+                       frame->data[2], frame->linesize[2]);
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, NULL, rect);
   SDL_RenderPresent(renderer);
