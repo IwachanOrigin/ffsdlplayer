@@ -7,6 +7,7 @@
 #include <queue>
 #include <mutex>
 #include <condition_variable>
+#include <iostream>
 
 extern "C"
 {
@@ -20,13 +21,13 @@ extern "C"
 void displayFrame(AVFrame*, SDL_Rect*, SDL_Texture*, SDL_Renderer*, double);
 void playaudio(AVCodecContext*, AVPacket*, AVFrame*, SDL_AudioDeviceID);
 
-// ã‚°ãƒ­ãƒ¼ãƒãƒ«å¤‰æ•°ã¨ã—ã¦ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã¨ãƒ¬ãƒ³ãƒ€ãƒ©ãƒ¼ã‚’ä¿æŒ
-SDL_Window* screen = NULL;
-SDL_Renderer* renderer = NULL;
-SDL_Texture* texture = NULL;
+// ƒOƒ[ƒoƒ‹•Ï”‚Æ‚µ‚ÄƒEƒBƒ“ƒhƒE‚ÆƒŒƒ“ƒ_ƒ‰[‚ğ•Û
+SDL_Window *screen = NULL;
+SDL_Renderer *renderer = NULL;
+SDL_Texture *texture = NULL;
 SDL_AudioDeviceID auddev;
 
-// ã‚¹ãƒ¬ãƒƒãƒ‰é–“ã®ãƒ‡ãƒ¼ã‚¿å…±æœ‰ã®ãŸã‚ã®ã‚­ãƒ¥ãƒ¼ã¨åŒæœŸç”¨ã®å¤‰æ•°
+// ƒXƒŒƒbƒhŠÔ‚Ìƒf[ƒ^‹¤—L‚Ì‚½‚ß‚ÌƒLƒ…[‚Æ“¯Šú—p‚Ì•Ï”
 std::queue<AVPacket*> packetQueue;
 std::queue<AVFrame*> frameQueue;
 std::mutex packetMutex, frameMutex;
@@ -37,16 +38,21 @@ bool renderFinished = false;
 
 void readThread(AVFormatContext* pFormatCtx)
 {
-  AVPacket* packet = av_packet_alloc();
-  while (av_read_frame(pFormatCtx, packet) >= 0)
-  {
-    std::unique_lock<std::mutex> lock(packetMutex);
-    packetQueue.push(packet);
-    packetCv.notify_one();  // ãƒ‡ã‚³ãƒ¼ãƒ‰ã‚¹ãƒ¬ãƒƒãƒ‰ã«é€šçŸ¥
-    packet = av_packet_alloc();  // æ–°ã—ã„ãƒ‘ã‚±ãƒƒãƒˆã‚’æº–å‚™
-  }
-  readFinished = true;
-  packetCv.notify_all();  // ãƒ‡ã‚³ãƒ¼ãƒ‰ã‚¹ãƒ¬ãƒƒãƒ‰ã«çµ‚äº†ã‚’é€šçŸ¥
+    AVPacket* packet = av_packet_alloc();
+    while (av_read_frame(pFormatCtx, packet) >= 0)
+    {
+        {
+            std::unique_lock<std::mutex> lock(packetMutex);
+            packetQueue.push(packet);
+        }
+        packetCv.notify_one();  // ƒfƒR[ƒhƒXƒŒƒbƒh‚É’Ê’m
+        packet = av_packet_alloc();  // V‚µ‚¢ƒpƒPƒbƒg‚ğ€”õ
+    }
+    {
+        std::unique_lock<std::mutex> lock(packetMutex);
+        readFinished = true;
+    }
+    packetCv.notify_all();  // ƒfƒR[ƒhƒXƒŒƒbƒh‚ÉI—¹‚ğ’Ê’m
 }
 
 void decodeThread(AVCodecContext* vidCtx, AVCodecContext* audCtx, int vidId, int audId)
@@ -56,11 +62,14 @@ void decodeThread(AVCodecContext* vidCtx, AVCodecContext* audCtx, int vidId, int
   while (true)
   {
     std::unique_lock<std::mutex> lock(packetMutex);
+    if (packetQueue.empty() && !readFinished) {
+      std::cout << "decodeThread: waiting on packetCv - packetQueue is empty, read is not finished" << std::endl;
+    }
     packetCv.wait(lock, [] { return !packetQueue.empty() || readFinished; });
 
     if (packetQueue.empty() && readFinished)
     {
-      break;  // èª­ã¿å–ã‚ŠãŒçµ‚äº†ã—ã¦ã„ã¦ã€å‡¦ç†ã™ã¹ããƒ‘ã‚±ãƒƒãƒˆãŒãªã„å ´åˆçµ‚äº†
+      break;  // “Ç‚İæ‚è‚ªI—¹‚µ‚Ä‚¢‚ÄAˆ—‚·‚×‚«ƒpƒPƒbƒg‚ª‚È‚¢ê‡I—¹
     }
 
     AVPacket* packet = packetQueue.front();
@@ -73,9 +82,11 @@ void decodeThread(AVCodecContext* vidCtx, AVCodecContext* audCtx, int vidId, int
       {
         while (avcodec_receive_frame(vidCtx, vframe) == 0)
         {
-          std::unique_lock<std::mutex> frameLock(frameMutex);
-          frameQueue.push(av_frame_clone(vframe));
-          frameCv.notify_one();  // ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¹ãƒ¬ãƒƒãƒ‰ã«é€šçŸ¥
+          {
+            std::unique_lock<std::mutex> frameLock(frameMutex);
+            frameQueue.push(av_frame_clone(vframe));
+          }
+          frameCv.notify_one();  // ƒŒƒ“ƒ_ƒŠƒ“ƒOƒXƒŒƒbƒh‚É’Ê’m
         }
       }
     }
@@ -85,22 +96,48 @@ void decodeThread(AVCodecContext* vidCtx, AVCodecContext* audCtx, int vidId, int
     }
     av_packet_unref(packet);
   }
-  decodeFinished = true;
-  frameCv.notify_all();  // ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã‚¹ãƒ¬ãƒƒãƒ‰ã«çµ‚äº†ã‚’é€šçŸ¥
+  {
+    std::unique_lock<std::mutex> lock(frameMutex);
+    decodeFinished = true;
+  }
+  frameCv.notify_all();  // ƒŒƒ“ƒ_ƒŠƒ“ƒOƒXƒŒƒbƒh‚ÉI—¹‚ğ’Ê’m
   av_frame_free(&vframe);
   av_frame_free(&aframe);
 }
 
 void renderThread(SDL_Rect* rect, double fpsrendering)
 {
+  SDL_Event event;
   while (true)
   {
+    // SDLƒCƒxƒ“ƒg‚ğˆ—
+    while (SDL_PollEvent(&event))
+    {
+      if (event.type == SDL_QUIT)
+      {
+        // ƒEƒBƒ“ƒhƒE‚ğ•Â‚¶‚éƒCƒxƒ“ƒg‚ª”­¶‚µ‚½ê‡AI—¹
+        {
+          std::unique_lock<std::mutex> lock(frameMutex);
+          decodeFinished = true;
+          renderFinished = true;
+        }
+        frameCv.notify_all();
+        renderFinishedCv.notify_one();
+        return;
+      }
+    }
+
     std::unique_lock<std::mutex> lock(frameMutex);
-    frameCv.wait(lock, [] { return !frameQueue.empty() || decodeFinished; });
+    if (frameQueue.empty() && !decodeFinished) {
+      std::cout << "renderThread: waiting - frameQueue is empty, decode is not finished" << std::endl;
+      lock.unlock();
+      SDL_Delay(10);  // ƒXƒŠ[ƒv‚ğg‚í‚¸A’Z‚¢‘Ò‹@‚Åƒ‹[ƒv‚ğ‰ñ‚·
+      continue;
+    }
 
     if (frameQueue.empty() && decodeFinished)
     {
-      break;  // ãƒ‡ã‚³ãƒ¼ãƒ‰ãŒçµ‚äº†ã—ã¦ã„ã¦ã€å‡¦ç†ã™ã¹ããƒ•ãƒ¬ãƒ¼ãƒ ãŒãªã„å ´åˆçµ‚äº†
+      break;  // ƒfƒR[ƒh‚ªI—¹‚µ‚Ä‚¢‚ÄAˆ—‚·‚×‚«ƒtƒŒ[ƒ€‚ª‚È‚¢ê‡I—¹
     }
 
     AVFrame* frame = frameQueue.front();
@@ -110,145 +147,148 @@ void renderThread(SDL_Rect* rect, double fpsrendering)
     displayFrame(frame, rect, texture, renderer, fpsrendering);
     av_frame_free(&frame);
   }
-  renderFinished = true;
+  {
+    std::unique_lock<std::mutex> lock(frameMutex);
+    renderFinished = true;
+  }
   renderFinishedCv.notify_one();
 }
 
+
 void play_video(const char* filename)
 {
-  AVFormatContext* pFormatCtx = nullptr;
-  int vidId = -1, audId = -1;
-  double fpsrendering = 0.0;
-  AVCodecContext* vidCtx, * audCtx;
-  AVCodecParameters* vidpar, * audpar;
-  SDL_Rect rect;
-  SDL_AudioSpec want, have;
+    AVFormatContext *pFormatCtx = nullptr;
+    int vidId = -1, audId = -1;
+    double fpsrendering = 0.0;
+    AVCodecContext *vidCtx, *audCtx;
+    AVCodecParameters *vidpar, *audpar;
+    SDL_Rect rect;
+    SDL_AudioSpec want, have;
 
-  pFormatCtx = avformat_alloc_context();
-  char bufmsg[1024]{};
-  if (avformat_open_input(&pFormatCtx, filename, NULL, NULL) < 0)
-  {
-    sprintf(bufmsg, "Cannot open %s", filename);
-    perror(bufmsg);
-    exit(EXIT_FAILURE);
-  }
-  if (avformat_find_stream_info(pFormatCtx, NULL) < 0)
-  {
-    perror("Cannot find stream info. Quitting.");
-    exit(EXIT_FAILURE);
-  }
-
-  for (int i = 0; i < pFormatCtx->nb_streams; i++)
-  {
-    AVCodecParameters* localparam = pFormatCtx->streams[i]->codecpar;
-    if (localparam->codec_type == AVMEDIA_TYPE_VIDEO)
+    pFormatCtx = avformat_alloc_context();
+    char bufmsg[1024]{};
+    if (avformat_open_input(&pFormatCtx, filename, NULL, NULL) < 0)
     {
-      const AVCodec* vidCodec = avcodec_find_decoder(localparam->codec_id);
-      vidpar = localparam;
-      vidId = i;
-      AVRational rational = pFormatCtx->streams[i]->avg_frame_rate;
-      fpsrendering = 1.0 / ((double)rational.num / (double)(rational.den));
-      vidCtx = avcodec_alloc_context3(vidCodec);
-      if (avcodec_parameters_to_context(vidCtx, vidpar) < 0)
-      {
-        perror("vidCtx");
+        sprintf(bufmsg, "Cannot open %s", filename);
+        perror(bufmsg);
         exit(EXIT_FAILURE);
-      }
-
-      if (avcodec_open2(vidCtx, vidCodec, NULL) < 0)
-      {
-        perror("vidCtx");
-        exit(EXIT_FAILURE);
-      }
     }
-    else if (localparam->codec_type == AVMEDIA_TYPE_AUDIO)
+    if (avformat_find_stream_info(pFormatCtx, NULL) < 0)
     {
-      const AVCodec* audCodec = avcodec_find_decoder(localparam->codec_id);
-      audpar = localparam;
-      audId = i;
-      audCtx = avcodec_alloc_context3(audCodec);
-      if (avcodec_parameters_to_context(audCtx, audpar) < 0)
-      {
-        perror("audCtx");
+        perror("Cannot find stream info. Quitting.");
         exit(EXIT_FAILURE);
-      }
+    }
 
-      if (avcodec_open2(audCtx, audCodec, NULL) < 0)
-      {
-        perror("audCtx");
+    for (int i = 0; i < pFormatCtx->nb_streams; i++)
+    {
+        AVCodecParameters *localparam = pFormatCtx->streams[i]->codecpar;
+        if (localparam->codec_type == AVMEDIA_TYPE_VIDEO)
+        {
+            const AVCodec* vidCodec = avcodec_find_decoder(localparam->codec_id);
+            vidpar = localparam;
+            vidId = i;
+            AVRational rational = pFormatCtx->streams[i]->avg_frame_rate;
+            fpsrendering = 1.0 / ((double)rational.num / (double)(rational.den));
+            vidCtx = avcodec_alloc_context3(vidCodec);
+            if (avcodec_parameters_to_context(vidCtx, vidpar) < 0)
+            {
+                perror("vidCtx");
+                exit(EXIT_FAILURE);
+            }
+
+            if (avcodec_open2(vidCtx, vidCodec, NULL) < 0)
+            {
+                perror("vidCtx");
+                exit(EXIT_FAILURE);
+            }
+        }
+        else if (localparam->codec_type == AVMEDIA_TYPE_AUDIO)
+        {
+            const AVCodec* audCodec = avcodec_find_decoder(localparam->codec_id);
+            audpar = localparam;
+            audId = i;
+            audCtx = avcodec_alloc_context3(audCodec);
+            if (avcodec_parameters_to_context(audCtx, audpar) < 0)
+            {
+                perror("audCtx");
+                exit(EXIT_FAILURE);
+            }
+
+            if (avcodec_open2(audCtx, audCodec, NULL) < 0)
+            {
+                perror("audCtx");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    // ƒEƒBƒ“ƒhƒE‚ÆƒŒƒ“ƒ_ƒ‰[‚ğ‰Šú‰»iÅ‰‚Ìˆê‰ñ‚¾‚¯j
+    if (screen == NULL)
+    {
+        screen = SDL_CreateWindow("Fplay", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                                  vidpar->width, vidpar->height, SDL_WINDOW_OPENGL);
+        if (!screen)
+        {
+            perror("screen");
+            exit(EXIT_FAILURE);
+        }
+        renderer = SDL_CreateRenderer(screen, -1, SDL_RENDERER_ACCELERATED);
+        if (!renderer)
+        {
+            perror("renderer");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // ƒeƒNƒXƒ`ƒƒ‚ÌXV
+    if (texture != NULL) {
+        SDL_DestroyTexture(texture);
+    }
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV,
+                                SDL_TEXTUREACCESS_STREAMING | SDL_TEXTUREACCESS_TARGET,
+                                vidpar->width, vidpar->height);
+    if (!texture) {
+        perror("texture");
         exit(EXIT_FAILURE);
-      }
     }
-  }
 
-  // ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã¨ãƒ¬ãƒ³ãƒ€ãƒ©ãƒ¼ã‚’åˆæœŸåŒ–ï¼ˆæœ€åˆã®ä¸€å›ã ã‘ï¼‰
-  if (screen == NULL)
-  {
-    screen = SDL_CreateWindow("Fplay", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              vidpar->width, vidpar->height, SDL_WINDOW_OPENGL);
-    if (!screen)
+    rect.x = 0;
+    rect.y = 0;
+    rect.w = vidpar->width;
+    rect.h = vidpar->height;
+
+    SDL_zero(want);
+    SDL_zero(have);
+    want.samples = audpar->sample_rate;
+    want.channels = audpar->ch_layout.nb_channels;
+    auddev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+    SDL_PauseAudioDevice(auddev, 0);
+    if (!auddev)
     {
-      perror("screen");
-      exit(EXIT_FAILURE);
+        perror("auddev");
+        exit(EXIT_FAILURE);
     }
-    renderer = SDL_CreateRenderer(screen, -1, SDL_RENDERER_ACCELERATED);
-    if (!renderer)
-    {
-      perror("renderer");
-      exit(EXIT_FAILURE);
-    }
-  }
 
-  // ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®æ›´æ–°
-  if (texture != NULL)
-  {
-    SDL_DestroyTexture(texture);
-  }
-  texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV,
-                              SDL_TEXTUREACCESS_STREAMING | SDL_TEXTUREACCESS_TARGET,
-                              vidpar->width, vidpar->height);
-  if (!texture)
-  {
-    perror("texture");
-    exit(EXIT_FAILURE);
-  }
+    // ƒXƒŒƒbƒh‚ÌŠJn
+    std::thread reader(readThread, pFormatCtx);
+    std::thread decoder(decodeThread, vidCtx, audCtx, vidId, audId);
+    std::thread rendererThread(renderThread, &rect, fpsrendering);
 
-  rect.x = 0;
-  rect.y = 0;
-  rect.w = vidpar->width;
-  rect.h = vidpar->height;
+    reader.detach();
+    decoder.detach();
+    rendererThread.detach();
 
-  SDL_zero(want);
-  SDL_zero(have);
-  want.samples = audpar->sample_rate;
-  want.channels = audpar->ch_layout.nb_channels;
-  auddev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-  SDL_PauseAudioDevice(auddev, 0);
-  if (!auddev)
-  {
-    perror("auddev");
-    exit(EXIT_FAILURE);
-  }
+    // ‘S‚Ä‚ÌƒXƒŒƒbƒh‚ªI—¹‚·‚é‚Ì‚ğ‘Ò‹@
+    std::unique_lock<std::mutex> lock(frameMutex);
+    std::cout << "mainThread: waiting on renderFinishedCv" << std::endl;
+    renderFinishedCv.wait(lock, [] { return renderFinished; });
 
-  // ã‚¹ãƒ¬ãƒƒãƒ‰ã®é–‹å§‹
-  std::thread reader(readThread, pFormatCtx);
-  std::thread decoder(decodeThread, vidCtx, audCtx, vidId, audId);
-  std::thread rendererThread(renderThread, &rect, fpsrendering);
-
-  reader.detach();
-  decoder.detach();
-  rendererThread.detach();
-
-  // å…¨ã¦ã®ã‚¹ãƒ¬ãƒƒãƒ‰ãŒçµ‚äº†ã™ã‚‹ã®ã‚’å¾…æ©Ÿ
-  std::unique_lock<std::mutex> lock(frameMutex);
-  renderFinishedCv.wait(lock, [] { return renderFinished; });
-
-  // å¾Œå‡¦ç†
-  SDL_CloseAudioDevice(auddev);
-  avcodec_free_context(&vidCtx);
-  avcodec_free_context(&audCtx);
-  avformat_close_input(&pFormatCtx);
-  avformat_free_context(pFormatCtx);
+    // Œãˆ—
+    SDL_CloseAudioDevice(auddev);
+    avcodec_free_context(&vidCtx);
+    avcodec_free_context(&audCtx);
+    avformat_close_input(&pFormatCtx);
+    avformat_free_context(pFormatCtx);
 }
 
 void displayFrame(AVFrame* frame, SDL_Rect* rect, SDL_Texture* texture, SDL_Renderer* renderer, double fpsrendering)
@@ -257,34 +297,35 @@ void displayFrame(AVFrame* frame, SDL_Rect* rect, SDL_Texture* texture, SDL_Rend
                        frame->data[0], frame->linesize[0],
                        frame->data[1], frame->linesize[1],
                        frame->data[2], frame->linesize[2]);
+  //SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // ÂF
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, NULL, rect);
   SDL_RenderPresent(renderer);
   SDL_Delay(static_cast<Uint32>(fpsrendering * 1000));
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-  if (argc < 2)
-  {
-    printf("usage: %s <filename1> <filename2> ...\n", argv[0]);
-    exit(EXIT_FAILURE);
-  }
+    if (argc < 2)
+    {
+        printf("usage: %s <filename1> <filename2> ...\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
-  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
-  for (int i = 1; i < argc; ++i)
-  {
-    play_video(argv[i]);
-    // å„ã‚¹ãƒ¬ãƒƒãƒ‰ã®å®Œäº†ãƒ•ãƒ©ã‚°ã‚’ãƒªã‚»ãƒƒãƒˆ
-    readFinished = false;
-    decodeFinished = false;
-    renderFinished = false;
-  }
+    for (int i = 1; i < argc; ++i)
+    {
+        play_video(argv[i]);
+        // ŠeƒXƒŒƒbƒh‚ÌŠ®—¹ƒtƒ‰ƒO‚ğƒŠƒZƒbƒg
+        readFinished = false;
+        decodeFinished = false;
+        renderFinished = false;
+    }
 
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(screen);
-  SDL_Quit();
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(screen);
+    SDL_Quit();
 
-  return 0;
+    return 0;
 }
